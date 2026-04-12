@@ -339,6 +339,11 @@ def parse_holdings_screenshot(lines: list[str]) -> list[dict]:
                 i += look
                 break
 
+        # 若没拿到绝对收益，但有收益率，反推：profit = amount * pct / (100 + pct)
+        # 原理：持有收益率 = profit/cost*100，cost = amount - profit → 解方程
+        if profit is None and pct is not None and amount > 0:
+            profit = round(amount * pct / (100 + pct), 2)
+
         rows.append({
             'raw_name': raw_name,
             'shares': 0.0,
@@ -418,6 +423,10 @@ def fuzzy_match_fund(raw_name: str, all_funds: list[dict]) -> list[dict]:
 
 
 def bulk_replace_holdings(rows: list[dict]) -> dict:
+    # DEBUG: 记录收到的原始数据
+    with open('/tmp/import_commit_debug.txt', 'w') as _dbg:
+        import json as _json
+        _dbg.write(_json.dumps(rows, ensure_ascii=False, indent=2, default=str))
     conn = get_connection()
     try:
         conn.execute('BEGIN')
@@ -425,17 +434,31 @@ def bulk_replace_holdings(rows: list[dict]) -> dict:
         for r in rows:
             shares = r['shares']
             cost_amount = r['cost_amount']
-            # 截图列表页没有份额，用 持有金额 ÷ 最新净值 反算
+            profit = r.get('profit', 0) or 0
+            # 截图列表页没有份额，直接用"持有金额"作为 shares 的替代
+            # portfolio.py 计算：current_value = shares * nav，但这里 shares 语义变成"金额份数"
+            # 更简单的做法：把 shares 设为 1，cost_amount 设为真实成本，
+            # 用 nav 字段存当前净值（即持有金额），让 portfolio 算出正确 profit
+            # ──────────────────────────────────────────────────────────────────
+            # 实际上最干净的方法：shares 存持有金额，nav 存 1.0，cost 存成本
+            # current_value = shares * 1.0 = 持有金额；profit = 持有金额 - 成本 ✓
             if shares == 0 and cost_amount > 0:
+                current_value = cost_amount + profit   # 持有金额 = 成本 + 持有收益
+                shares = current_value   # shares 当作"持有金额"，nav 固定为 1.0
+                # 同时需要在 nav_history 里插入一条 nav=1.0 的记录让 portfolio 读到
+                # 但这样会破坏真实净值数据——所以改用另一种方式：
+                # 直接存真实份额（用持有金额 ÷ 最新净值）并接受轻微误差，
+                # 但同时把 cost_amount 调整为 shares * nav - profit，
+                # 保证 profit 计算正确
                 nav_row = conn.execute(
                     'SELECT nav FROM nav_history WHERE code=? ORDER BY date DESC LIMIT 1',
                     (r['code'],)
                 ).fetchone()
                 if nav_row and nav_row['nav'] and nav_row['nav'] > 0:
-                    # amount = cost_amount + profit，前端传来的 cost_amount 已经是成本
-                    # 用 (cost_amount + profit) ÷ nav 得到份额
-                    current_value = cost_amount + r.get('profit', 0)
-                    shares = round(current_value / nav_row['nav'], 4)
+                    nav = nav_row['nav']
+                    shares = round(current_value / nav, 4)
+                    # 反推成本：让 shares*nav - cost = profit
+                    cost_amount = round(shares * nav - profit, 4)
             conn.execute(
                 'INSERT INTO holdings (code, shares, cost_amount, buy_date) VALUES (?, ?, ?, ?)',
                 (r['code'], shares, cost_amount, r.get('buy_date', ''))
