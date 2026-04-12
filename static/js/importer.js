@@ -265,6 +265,7 @@ function _buildCommitRows() {
                 code,
                 shares,
                 cost_amount: parseFloat((amount - profit).toFixed(4)),
+                profit,
                 buy_date: '',
             });
         } else {
