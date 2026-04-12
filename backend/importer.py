@@ -423,10 +423,6 @@ def fuzzy_match_fund(raw_name: str, all_funds: list[dict]) -> list[dict]:
 
 
 def bulk_replace_holdings(rows: list[dict]) -> dict:
-    # DEBUG: 记录收到的原始数据
-    with open('/tmp/import_commit_debug.txt', 'w') as _dbg:
-        import json as _json
-        _dbg.write(_json.dumps(rows, ensure_ascii=False, indent=2, default=str))
     conn = get_connection()
     try:
         conn.execute('BEGIN')
