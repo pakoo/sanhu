@@ -1,0 +1,73 @@
+// API 客户端
+const API = {
+    async get(url) {
+        const resp = await fetch(url);
+        return resp.json();
+    },
+
+    async post(url, data) {
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        return resp.json();
+    },
+
+    // 持仓
+    getPortfolio() { return this.get('/api/portfolio'); },
+    getHoldingDetail(code) { return this.get(`/api/portfolio/${code}`); },
+    recordTransaction(data) { return this.post('/api/portfolio/transaction', data); },
+
+    // 基金数据
+    searchFund(q) { return this.get(`/api/funds/search?q=${encodeURIComponent(q)}`); },
+    getNav(code, days = 365) { return this.get(`/api/funds/${code}/nav?days=${days}`); },
+    getRealtime(code) { return this.get(`/api/funds/${code}/realtime`); },
+    refreshData() { return this.post('/api/funds/refresh'); },
+
+    // 风险分析
+    getRiskAnalysis() { return this.get('/api/risk/analysis'); },
+    getCorrelation() { return this.get('/api/risk/correlation'); },
+
+    // 调仓建议
+    getRebalanceSuggestions() { return this.get('/api/rebalance/suggestions'); },
+    getTargetAllocation() { return this.get('/api/rebalance/target'); },
+    setTargetAllocation(data) { return this.post('/api/rebalance/target', data); },
+    getTransitionPlan(months, monthly) {
+        return this.get(`/api/rebalance/transition?months=${months}&monthly_invest=${monthly}`);
+    },
+
+    // 回测
+    backtestDCA(data) { return this.post('/api/backtest/dca', data); },
+    backtestTakeProfit(data) { return this.post('/api/backtest/takeprofit', data); },
+    backtestPortfolio(data) { return this.post('/api/backtest/portfolio', data); },
+
+    // 持仓透视
+    getFundStocks(code) { return this.get(`/api/holdings/${code}/stocks`); },
+    getFundIndustry(code) { return this.get(`/api/holdings/${code}/industry`); },
+    getHoldingsOverlap() { return this.get('/api/holdings/overlap'); },
+    getIndustryTotal() { return this.get('/api/holdings/industry-total'); },
+    getHoldingsChanges(code) { return this.get(`/api/holdings/${code}/changes`); },
+    refreshHoldings() { return this.post('/api/holdings/refresh'); },
+
+    // v2.0
+    getMarketValuation() { return this.get('/api/market/valuation'); },
+    refreshMarketValuation() { return this.post('/api/market/valuation/refresh'); },
+    getFundScores() { return this.get('/api/funds/scores'); },
+    refreshFundScores() { return this.post('/api/funds/scores/refresh'); },
+    getAIContext() { return this.get('/api/ai/context'); },
+
+    // 关注列表
+    getWatchlist() { return this.get('/api/watchlist'); },
+    addToWatchlist(code) { return this.post('/api/watchlist/add', { code }); },
+    removeFromWatchlist(code) {
+        return fetch(`/api/watchlist/${code}`, { method: 'DELETE' }).then(r => r.json());
+    },
+
+    // 截图导入
+    parseImport(formData) {
+        // 不设 Content-Type，让浏览器自动处理 multipart boundary
+        return fetch('/api/import/parse', { method: 'POST', body: formData }).then(r => r.json());
+    },
+    commitImport(data) { return this.post('/api/import/commit', data); },
+};

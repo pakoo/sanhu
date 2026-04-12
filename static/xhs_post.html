@@ -1,0 +1,602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>基金管理系统 小红书轮播图</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:#1a1a1a;
+  font-family:'Noto Sans SC',sans-serif;
+  display:flex;flex-direction:column;align-items:center;
+  gap:28px;padding:80px 20px 60px;
+}
+
+.controls{
+  position:fixed;top:0;left:0;right:0;
+  background:rgba(15,15,15,0.96);
+  backdrop-filter:blur(12px);
+  padding:14px 24px;
+  display:flex;align-items:center;justify-content:center;gap:16px;
+  z-index:100;border-bottom:1px solid #333;
+}
+.controls span{color:#666;font-size:13px;}
+.btn-dl{
+  background:linear-gradient(135deg,#3b82f6,#6366f1);
+  color:#fff;border:none;
+  padding:10px 28px;border-radius:24px;
+  font-size:14px;font-weight:700;cursor:pointer;
+  font-family:inherit;transition:all .2s;
+}
+.btn-dl:hover{transform:scale(1.03);}
+.btn-dl:disabled{background:#444;cursor:wait;}
+
+/* Card base — 3:4 ratio */
+.card{
+  width:540px;height:720px;
+  border-radius:4px;overflow:hidden;
+  flex-shrink:0;position:relative;
+}
+
+/* ============ CARD 1: COVER ============ */
+#card1{background:#0a0a0f;}
+.c1-bg{
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse at 70% 20%, rgba(59,130,246,0.25) 0%, transparent 60%),
+             radial-gradient(ellipse at 20% 80%, rgba(99,102,241,0.2) 0%, transparent 50%);
+}
+.c1-grid{
+  position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                   linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+  background-size:40px 40px;
+}
+.c1-inner{
+  position:relative;z-index:2;
+  height:100%;display:flex;flex-direction:column;
+  padding:48px 40px 40px;
+}
+.c1-tag{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(59,130,246,0.15);
+  border:1px solid rgba(59,130,246,0.3);
+  color:#60a5fa;font-size:12px;font-weight:500;
+  padding:4px 12px;border-radius:20px;
+  width:fit-content;margin-bottom:32px;
+}
+.c1-tag::before{content:'';width:6px;height:6px;border-radius:50%;background:#3b82f6;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
+.c1-title{
+  font-size:46px;font-weight:900;line-height:1.15;
+  color:#fff;letter-spacing:-1px;margin-bottom:12px;
+}
+.c1-title span{
+  background:linear-gradient(135deg,#60a5fa,#a78bfa);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.c1-sub{
+  font-size:16px;color:#94a3b8;font-weight:400;
+  line-height:1.6;margin-bottom:auto;
+}
+.c1-stats{
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;
+  padding:24px;
+  background:rgba(255,255,255,0.04);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;
+}
+.c1-stat-item{text-align:center;}
+.c1-stat-num{
+  font-size:22px;font-weight:800;
+  background:linear-gradient(135deg,#60a5fa,#a78bfa);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+}
+.c1-stat-label{font-size:11px;color:#64748b;margin-top:3px;}
+.c1-footer{
+  display:flex;justify-content:space-between;align-items:center;
+  margin-top:20px;
+}
+.c1-author{font-size:12px;color:#475569;}
+.c1-badge{
+  font-size:11px;color:#3b82f6;
+  background:rgba(59,130,246,0.1);
+  padding:4px 10px;border-radius:20px;
+  border:1px solid rgba(59,130,246,0.2);
+}
+
+/* ============ CARD 2: 痛点 ============ */
+#card2{background:#0d0d14;}
+.c2-inner{
+  height:100%;display:flex;flex-direction:column;
+  padding:40px;
+}
+.c-page-num{font-size:11px;color:#3b4a6b;font-weight:500;margin-bottom:28px;}
+.c2-headline{
+  font-size:28px;font-weight:800;color:#e2e8f0;
+  line-height:1.3;margin-bottom:8px;
+}
+.c2-headline em{color:#f59e0b;font-style:normal;}
+.c2-desc{font-size:13px;color:#64748b;margin-bottom:32px;line-height:1.7;}
+.pain-item{
+  display:flex;gap:14px;align-items:flex-start;
+  padding:16px;margin-bottom:12px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;
+  border-left:3px solid #f59e0b;
+}
+.pain-icon{font-size:20px;flex-shrink:0;margin-top:2px;}
+.pain-title{font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:4px;}
+.pain-desc{font-size:12px;color:#64748b;line-height:1.6;}
+.c2-arrow{
+  margin-top:auto;text-align:center;
+  color:#3b82f6;font-size:13px;font-weight:500;
+}
+
+/* ============ CARD 3: 核心功能 ============ */
+#card3{background:#0d0d14;}
+.c3-inner{
+  height:100%;display:flex;flex-direction:column;
+  padding:36px 40px;
+}
+.c3-title{
+  font-size:22px;font-weight:800;color:#e2e8f0;
+  margin-bottom:6px;
+}
+.c3-sub{font-size:12px;color:#4a5568;margin-bottom:24px;}
+.feature-card{
+  padding:16px 18px;margin-bottom:12px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.07);
+  border-radius:12px;
+  display:flex;gap:14px;align-items:flex-start;
+}
+.feature-num{
+  width:28px;height:28px;border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:800;flex-shrink:0;margin-top:1px;
+}
+.fn1{background:rgba(59,130,246,0.2);color:#60a5fa;}
+.fn2{background:rgba(239,68,68,0.15);color:#f87171;}
+.fn3{background:rgba(245,158,11,0.15);color:#fbbf24;}
+.fn4{background:rgba(16,185,129,0.15);color:#34d399;}
+.feature-title{font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:4px;}
+.feature-desc{font-size:12px;color:#64748b;line-height:1.55;}
+.feature-tag{
+  font-size:10px;margin-top:5px;
+  display:inline-block;padding:2px 8px;border-radius:4px;
+}
+.ft1{background:rgba(59,130,246,0.15);color:#60a5fa;}
+.ft2{background:rgba(239,68,68,0.12);color:#f87171;}
+.ft3{background:rgba(245,158,11,0.12);color:#fbbf24;}
+.ft4{background:rgba(16,185,129,0.12);color:#34d399;}
+
+/* ============ CARD 4: 数据截图感 ============ */
+#card4{background:#08080f;}
+.c4-inner{
+  height:100%;display:flex;flex-direction:column;
+  padding:36px 40px;
+}
+.c4-title{font-size:22px;font-weight:800;color:#e2e8f0;margin-bottom:4px;}
+.c4-sub{font-size:12px;color:#4a5568;margin-bottom:24px;}
+
+.dash-mock{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.08);
+  border-radius:16px;padding:20px;margin-bottom:16px;
+}
+.dash-row{
+  display:flex;justify-content:space-between;align-items:flex-end;
+  margin-bottom:16px;
+}
+.dash-label{font-size:11px;color:#4a5568;margin-bottom:4px;}
+.dash-val{font-size:24px;font-weight:800;color:#e2e8f0;}
+.dash-profit{font-size:14px;font-weight:700;color:#ef4444;}
+.dash-divider{height:1px;background:rgba(255,255,255,0.06);margin:12px 0;}
+.alloc-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;margin-bottom:6px;}
+.ab1{flex:8.515;background:#3b82f6;}
+.ab2{flex:0.504;background:#ef4444;}
+.ab3{flex:0.841;background:#f59e0b;}
+.ab4{flex:0.14;background:#10b981;}
+.alloc-legend{display:flex;gap:12px;flex-wrap:wrap;}
+.al-item{display:flex;align-items:center;gap:4px;font-size:10px;color:#64748b;}
+.al-dot{width:6px;height:6px;border-radius:50%;}
+
+.suggest-item{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:10px 14px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:8px;margin-bottom:8px;
+}
+.si-left{display:flex;align-items:center;gap:10px;}
+.si-badge{
+  font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;
+}
+.sib-sell{background:rgba(239,68,68,0.15);color:#f87171;}
+.sib-buy{background:rgba(16,185,129,0.15);color:#34d399;}
+.si-name{font-size:13px;color:#cbd5e1;}
+.si-amount{font-size:14px;font-weight:700;color:#e2e8f0;}
+
+/* ============ CARD 5: 技术亮点 ============ */
+#card5{background:#0d0d14;}
+.c5-inner{
+  height:100%;display:flex;flex-direction:column;
+  padding:36px 40px;
+}
+.c5-title{font-size:22px;font-weight:800;color:#e2e8f0;margin-bottom:4px;}
+.c5-sub{font-size:12px;color:#4a5568;margin-bottom:24px;}
+.code-block{
+  background:#060610;
+  border:1px solid rgba(99,102,241,0.2);
+  border-radius:12px;padding:18px;margin-bottom:16px;
+  font-family:'Courier New',monospace;
+}
+.code-top{
+  display:flex;gap:6px;margin-bottom:12px;
+}
+.code-dot{width:10px;height:10px;border-radius:50%;}
+.cd1{background:#ff5f57;}.cd2{background:#febc2e;}.cd3{background:#28c840;}
+.code-line{font-size:12px;line-height:1.8;color:#7c83a2;}
+.code-line .cmd{color:#60a5fa;}
+.code-line .str{color:#a78bfa;}
+.code-line .cmt{color:#374151;font-style:italic;}
+.tech-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:10px;
+}
+.tech-item{
+  padding:14px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:10px;
+}
+.ti-icon{font-size:18px;margin-bottom:6px;}
+.ti-title{font-size:12px;font-weight:700;color:#e2e8f0;margin-bottom:3px;}
+.ti-desc{font-size:11px;color:#64748b;line-height:1.5;}
+.c5-footer{
+  margin-top:auto;text-align:center;
+  font-size:11px;color:#374151;
+}
+
+/* ============ CARD 6: CTA ============ */
+#card6{background:#0a0a0f;}
+.c6-bg{
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse at 50% 30%, rgba(99,102,241,0.2) 0%, transparent 60%);
+}
+.c6-inner{
+  position:relative;z-index:2;
+  height:100%;display:flex;flex-direction:column;
+  padding:48px 40px 40px;
+}
+.c6-title{
+  font-size:30px;font-weight:900;color:#e2e8f0;
+  line-height:1.3;margin-bottom:6px;text-align:center;
+}
+.c6-sub{font-size:13px;color:#4a5568;text-align:center;margin-bottom:32px;}
+.checklist-item{
+  display:flex;align-items:flex-start;gap:12px;
+  padding:12px 16px;margin-bottom:8px;
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.06);
+  border-radius:10px;
+}
+.check-icon{
+  width:20px;height:20px;border-radius:6px;
+  background:rgba(59,130,246,0.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;flex-shrink:0;color:#60a5fa;font-weight:700;
+  margin-top:1px;
+}
+.check-text{font-size:13px;color:#cbd5e1;line-height:1.5;}
+.check-text strong{color:#e2e8f0;font-weight:700;}
+.c6-cta{
+  margin-top:auto;
+  padding:20px;text-align:center;
+  background:rgba(59,130,246,0.08);
+  border:1px solid rgba(59,130,246,0.2);
+  border-radius:14px;
+}
+.c6-cta-main{
+  font-size:18px;font-weight:800;
+  background:linear-gradient(135deg,#60a5fa,#a78bfa);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  margin-bottom:6px;
+}
+.c6-cta-sub{font-size:12px;color:#4a5568;}
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <span>共 6 张 · 540×720 · 3:4</span>
+  <button class="btn-dl" id="dlBtn" onclick="dlAll()">⬇ 一键下载全部图片</button>
+  <span id="prog" style="color:#60a5fa;font-size:13px;"></span>
+</div>
+
+<!-- ======== CARD 1: COVER ======== -->
+<div class="card" id="card1">
+  <div class="c1-bg"></div>
+  <div class="c1-grid"></div>
+  <div class="c1-inner">
+    <div class="c1-tag">
+      <span style="width:6px;height:6px;border-radius:50%;background:#3b82f6;display:inline-block;"></span>
+      程序员理财
+    </div>
+    <div class="c1-title">
+      41万基金<br>我<span>自己写了</span><br>管理系统
+    </div>
+    <div class="c1-sub" style="margin-top:14px;">
+      支付宝的分析页不够用<br>
+      于是花了几天用 Python 写了个<br>
+      能自动预警 + 回测策略的工具
+    </div>
+    <div style="flex:1;"></div>
+    <div class="c1-stats">
+      <div class="c1-stat-item">
+        <div class="c1-stat-num">4</div>
+        <div class="c1-stat-label">核心模块</div>
+      </div>
+      <div class="c1-stat-item">
+        <div class="c1-stat-num">8只</div>
+        <div class="c1-stat-label">基金跟踪</div>
+      </div>
+      <div class="c1-stat-item">
+        <div class="c1-stat-num">3年</div>
+        <div class="c1-stat-label">历史回测</div>
+      </div>
+    </div>
+    <div class="c1-footer">
+      <span class="c1-author">数据来源：天天基金 · 本地部署</span>
+      <span class="c1-badge">开源可用</span>
+    </div>
+  </div>
+</div>
+
+<!-- ======== CARD 2: 痛点 ======== -->
+<div class="card" id="card2">
+  <div class="c2-inner">
+    <div class="c-page-num">01 / 05</div>
+    <div class="c2-headline">支付宝告诉你涨跌<br>但不告诉你<em>该怎么办</em></div>
+    <div class="c2-desc">持了好几只基金 每天刷收益 但没有人告诉我仓位合不合理、亏的那只要不要止损</div>
+
+    <div class="pain-item">
+      <div class="pain-icon">📊</div>
+      <div>
+        <div class="pain-title">看不清配置结构</div>
+        <div class="pain-desc">我有几只债基几只股基？占比多少？支付宝只给你一个列表，没有任何分析</div>
+      </div>
+    </div>
+    <div class="pain-item">
+      <div class="pain-icon">⚠️</div>
+      <div>
+        <div class="pain-title">风险没人帮你盯</div>
+        <div class="pain-desc">债基占了85%，这正常吗？集中度太高了也不会有人提醒你</div>
+      </div>
+    </div>
+    <div class="pain-item">
+      <div class="pain-icon">🤔</div>
+      <div>
+        <div class="pain-title">定投没有数据支撑</div>
+        <div class="pain-desc">什么时候止盈？定投多少合适？全靠感觉 没有历史数据验证</div>
+      </div>
+    </div>
+
+    <div class="c2-arrow" style="margin-top:20px;">于是我决定自己解决这个问题 →</div>
+  </div>
+</div>
+
+<!-- ======== CARD 3: 核心功能 ======== -->
+<div class="card" id="card3">
+  <div class="c3-inner">
+    <div class="c-page-num">02 / 05</div>
+    <div class="c3-title">4 个核心功能</div>
+    <div class="c3-sub">覆盖从看持仓 → 分析风险 → 制定策略的完整链路</div>
+
+    <div class="feature-card">
+      <div class="feature-num fn1">01</div>
+      <div>
+        <div class="feature-title">持仓总览仪表盘</div>
+        <div class="feature-desc">总资产、持有收益、配置比例一眼看清。饼图展示债券/股票/QDII占比，各基金盈亏一览无余</div>
+        <span class="feature-tag ft1">实时数据</span>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num fn2">02</div>
+      <div>
+        <div class="feature-title">风险自动预警</div>
+        <div class="feature-desc">集中度过高？某只基金回撤超阈值？自动生成预警列表，还有基金间相关性热力图</div>
+        <span class="feature-tag ft2">6条预警</span>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num fn3">03</div>
+      <div>
+        <div class="feature-title">智能调仓建议</div>
+        <div class="feature-desc">设置目标配置比例，系统自动算出买入/卖出哪只、各多少钱，还有渐进式调仓计划</div>
+        <span class="feature-tag ft3">具体到金额</span>
+      </div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-num fn4">04</div>
+      <div>
+        <div class="feature-title">定投 / 止盈回测</div>
+        <div class="feature-desc">用历史净值模拟定投策略，自动对比不同止盈点位的收益差异，有图有真相</div>
+        <span class="feature-tag ft4">3年历史数据</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======== CARD 4: 数据展示 ======== -->
+<div class="card" id="card4">
+  <div class="c4-inner">
+    <div class="c-page-num">03 / 05</div>
+    <div class="c4-title">真实数据长这样</div>
+    <div class="c4-sub">我自己的持仓 41.5万 8只基金</div>
+
+    <div class="dash-mock">
+      <div class="dash-row">
+        <div>
+          <div class="dash-label">总资产</div>
+          <div class="dash-val">415,115</div>
+        </div>
+        <div style="text-align:right;">
+          <div class="dash-label">持有收益</div>
+          <div class="dash-profit">+9,845 (+2.43%)</div>
+        </div>
+      </div>
+      <div class="dash-divider"></div>
+      <div class="dash-label" style="margin-bottom:8px;">资产配置</div>
+      <div class="alloc-bar">
+        <div class="ab1"></div><div class="ab2"></div>
+        <div class="ab3"></div><div class="ab4"></div>
+      </div>
+      <div class="alloc-legend">
+        <div class="al-item"><div class="al-dot" style="background:#3b82f6;"></div>债券 85.1%</div>
+        <div class="al-item"><div class="al-dot" style="background:#ef4444;"></div>股票 5.0%</div>
+        <div class="al-item"><div class="al-dot" style="background:#f59e0b;"></div>混合 8.4%</div>
+        <div class="al-item"><div class="al-dot" style="background:#10b981;"></div>QDII 1.4%</div>
+      </div>
+    </div>
+
+    <div style="font-size:12px;color:#4a5568;margin-bottom:10px;font-weight:500;">调仓建议（目标：债60% 股20% QDII10%）</div>
+    <div class="suggest-item">
+      <div class="si-left">
+        <span class="si-badge sib-sell">减仓</span>
+        <span class="si-name">债券型</span>
+      </div>
+      <span class="si-amount">-104,419 元</span>
+    </div>
+    <div class="suggest-item">
+      <div class="si-left">
+        <span class="si-badge sib-buy">加仓</span>
+        <span class="si-name">股票型</span>
+      </div>
+      <span class="si-amount">+62,118 元</span>
+    </div>
+    <div class="suggest-item">
+      <div class="si-left">
+        <span class="si-badge sib-buy">加仓</span>
+        <span class="si-name">QDII/海外</span>
+      </div>
+      <span class="si-amount">+35,708 元</span>
+    </div>
+  </div>
+</div>
+
+<!-- ======== CARD 5: 技术亮点 ======== -->
+<div class="card" id="card5">
+  <div class="c5-inner">
+    <div class="c-page-num">04 / 05</div>
+    <div class="c5-title">技术实现</div>
+    <div class="c5-sub">一行命令启动，没有任何多余依赖</div>
+
+    <div class="code-block">
+      <div class="code-top">
+        <div class="code-dot cd1"></div>
+        <div class="code-dot cd2"></div>
+        <div class="code-dot cd3"></div>
+      </div>
+      <div class="code-line"><span class="cmt"># 安装依赖（一次就够）</span></div>
+      <div class="code-line"><span class="cmd">pip install</span> fastapi uvicorn pandas</div>
+      <div class="code-line" style="margin-top:8px;"><span class="cmt"># 初始化你的持仓数据</span></div>
+      <div class="code-line"><span class="cmd">python3</span> scripts/seed_data.py</div>
+      <div class="code-line" style="margin-top:8px;"><span class="cmt"># 启动！打开浏览器就能用</span></div>
+      <div class="code-line"><span class="cmd">uvicorn</span> app:app <span class="str">--reload</span></div>
+    </div>
+
+    <div class="tech-grid">
+      <div class="tech-item">
+        <div class="ti-icon">⚡</div>
+        <div class="ti-title">FastAPI 后端</div>
+        <div class="ti-desc">Python 写逻辑，API 响应飞快</div>
+      </div>
+      <div class="tech-item">
+        <div class="ti-icon">📦</div>
+        <div class="ti-title">零构建前端</div>
+        <div class="ti-desc">纯 HTML + ECharts，不需要 Node.js</div>
+      </div>
+      <div class="tech-item">
+        <div class="ti-icon">🔒</div>
+        <div class="ti-title">本地 SQLite</div>
+        <div class="ti-desc">数据全在本地，不上传任何云端</div>
+      </div>
+      <div class="tech-item">
+        <div class="ti-icon">📡</div>
+        <div class="ti-title">天天基金 API</div>
+        <div class="ti-desc">自动抓取净值，3年历史数据</div>
+      </div>
+    </div>
+
+    <div class="c5-footer" style="margin-top:16px;">
+      Claude 辅助开发 · 完整代码可复用
+    </div>
+  </div>
+</div>
+
+<!-- ======== CARD 6: CTA ======== -->
+<div class="card" id="card6">
+  <div class="c6-bg"></div>
+  <div class="c6-inner">
+    <div class="c-page-num" style="color:#3b4a6b;">05 / 05</div>
+    <div style="flex:1;"></div>
+    <div class="c6-title">这套系统帮我<br>发现了什么？</div>
+    <div class="c6-sub" style="margin-top:8px;">几个用之前没意识到的问题</div>
+
+    <div style="margin-top:24px;">
+      <div class="checklist-item">
+        <div class="check-icon">!</div>
+        <div class="check-text"><strong>债基集中度过高</strong>：单只基金占总仓位 48%，远超合理上限</div>
+      </div>
+      <div class="checklist-item">
+        <div class="check-icon">!</div>
+        <div class="check-text"><strong>权益配置严重不足</strong>：股票类加起来只有 13%，长期收益天花板很低</div>
+      </div>
+      <div class="checklist-item">
+        <div class="check-icon">✓</div>
+        <div class="check-text"><strong>制定了调仓路线图</strong>：6个月内通过定投把权益比例从 13% 提升到 25%</div>
+      </div>
+      <div class="checklist-item">
+        <div class="check-icon">✓</div>
+        <div class="check-text"><strong>找到最优定投策略</strong>：回测显示月定投 + 15% 止盈比单纯持有收益高</div>
+      </div>
+    </div>
+
+    <div class="c6-cta">
+      <div class="c6-cta-main">想要完整代码？评论区扣 1</div>
+      <div class="c6-cta-sub">用过支付宝分析不够用的 点个收藏备用</div>
+    </div>
+    <div style="flex:1;"></div>
+  </div>
+</div>
+
+<script>
+async function dlAll(){
+  var btn=document.getElementById('dlBtn'),msg=document.getElementById('prog');
+  var total=6;
+  btn.disabled=true;btn.textContent='⏳ 导出中...';
+  for(var i=1;i<=total;i++){
+    msg.textContent='正在导出第 '+i+'/'+total+' 张...';
+    try{
+      var c=await html2canvas(document.getElementById('card'+i),{
+        scale:3,useCORS:true,
+        backgroundColor:'#0a0a0f',
+        width:540,height:720
+      });
+      var a=document.createElement('a');
+      a.download='基金管理系统_'+i+'.png';
+      a.href=c.toDataURL('image/png');a.click();
+      await new Promise(function(r){setTimeout(r,700)});
+    }catch(e){console.error(e)}
+  }
+  btn.disabled=false;btn.textContent='⬇ 一键下载全部图片';
+  msg.textContent='✅ 全部完成！';
+  setTimeout(function(){msg.textContent=''},3000);
+}
+</script>
+</body>
+</html>

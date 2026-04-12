@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 数据库（用户数据不入库，seed.sql 入库）
+data/*.db
+data/*.db-shm
+data/*.db-wal
+jijin.db
+data/funds.db
+
+# 日志
+logs/
+
+# 系统
+.DS_Store
+.env
