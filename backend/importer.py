@@ -22,6 +22,7 @@ def get_reader():
 
 def ocr_image(image_bytes: bytes) -> list[str]:
     """运行 EasyOCR，返回按 y 坐标排序的文本行列表"""
+    import numpy as np
     from PIL import Image
     img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
     if img.width > 1200:
@@ -29,7 +30,7 @@ def ocr_image(image_bytes: bytes) -> list[str]:
         img = img.resize((1200, int(img.height * ratio)))
 
     reader = get_reader()
-    results = reader.readtext(img)
+    results = reader.readtext(np.array(img))
 
     if not results:
         return []
@@ -66,6 +67,12 @@ _HOLDINGS_RE = re.compile(
     r'.*?持有收益[：:\s]*([+\-＋－]?[\d,，]+\.?\d*)元',
     re.DOTALL,
 )
+
+# 支付宝"持有"列表视图：基金名 / 金额 / 昨日收益 / 持有收益率
+# 例：易方达中债3-5年国开行债券指数A / 198,680.99 / 0.00 / +2.27%
+_ALIPAY_LIST_AMOUNT_RE = re.compile(r'^([\d,，]+\.\d{2})$')
+_ALIPAY_LIST_RETURN_RE = re.compile(r'^([+\-＋－][\d,，]+\.\d{2})$')  # 昨日收益（绝对值）
+_ALIPAY_LIST_PCT_RE    = re.compile(r'^([+\-＋－]?\d+\.\d+)%$')       # 持有收益率
 _DATE_RE = re.compile(
     r'(\d{4}[-年]\d{1,2}[-月]\d{1,2}日?)\s*(买入成功|卖出成功|买入|卖出|赎回成功|赎回)'
 )
@@ -92,10 +99,46 @@ def _normalize_date(raw: str) -> str:
     return cleaned
 
 
+def _is_fund_name(s: str) -> bool:
+    """判断一行文字是否像基金名称：至少4个字符，含中文，不全是数字/符号"""
+    if not s or len(s) < 4:
+        return False
+    if not re.search(r'[\u4e00-\u9fff]', s):
+        return False
+    if re.fullmatch(r'[\d.,%+\-\s元份额市值收益昨日持有排序全部偏股偏债指数黄金]+', s):
+        return False
+    # 过滤支付宝 UI 控件文字
+    skip = {'收益明细', '持仓分析', '交易记录', '投资计划', '清仓分析', '反馈与投诉',
+            '我的持有', '金额排序', '更多产品', '去市场看看', '热销基金', '去看看',
+            '基金销售服务', '资金安全有保障', '我的总资产', '市场解读',
+            '名称', '金额', '昨日收益', '持有收益', '持有收益率'}
+    if s in skip:
+        return False
+    # "产品提醒 xxx"、"市场解读 xxx" 这类插屏广告行
+    if re.match(r'^(产品提醒|市场解读|热销基金)', s):
+        return False
+    if s in skip:
+        return False
+    # 含"/"的表头行（如"金额/昨日收益"、"持有收益/率"）
+    if re.search(r'[\u4e00-\u9fff]+/[\u4e00-\u9fff]+', s):
+        return False
+    # 含括号的说明行（如"昨日收益（元）"）
+    if re.search(r'[\u4e00-\u9fff]+[（(]元[）)]', s):
+        return False
+    return True
+
+
 def parse_holdings_screenshot(lines: list[str]) -> list[dict]:
-    full_text = '\n'.join(lines)
+    """
+    支持两种支付宝截图格式：
+    A. 详情页：含"持有份额/持有市值/持有收益"关键词
+    B. 列表页（持有Tab）：基金名 → 金额 → 昨日收益 → 持有收益率（逐行）
+    """
     rows = []
+
+    # ── 格式 A：详情页 ─────────────────────────────────────────────────────
     i = 0
+    detail_found = False
     while i < len(lines):
         line = lines[i]
         combined = line
@@ -103,37 +146,83 @@ def parse_holdings_screenshot(lines: list[str]) -> list[dict]:
             combined = line + ' ' + lines[i + 1]
 
         m = _HOLDINGS_RE.search(combined)
-        if not m:
+        if m:
+            detail_found = True
+            shares = _clean_num(m.group(1))
+            amount = _clean_num(m.group(3))
+            profit_str = m.group(4).replace('＋', '+').replace('－', '-')
+            profit = _clean_num(profit_str)
+
+            raw_name = ''
+            for j in range(i - 1, max(i - 5, -1), -1):
+                candidate = lines[j].strip()
+                if _is_fund_name(candidate):
+                    raw_name = candidate
+                    break
+
+            if shares is not None or amount is not None:
+                filled = sum(v is not None for v in [shares, amount, profit])
+                confidence = 'high' if filled == 3 else ('medium' if filled == 2 else 'low')
+                rows.append({
+                    'raw_name': raw_name,
+                    'shares': shares or 0.0,
+                    'amount': amount or 0.0,
+                    'profit': profit or 0.0,
+                    'confidence': confidence,
+                })
+            i += 2
+        else:
+            i += 1
+
+    if detail_found:
+        return rows
+
+    # ── 格式 B：列表页（持有Tab）─────────────────────────────────────────────
+    # 每只基金的行顺序：基金名（可能跨2行）→ 金额 → 昨日收益 → 持有收益率
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        if not _is_fund_name(line):
             i += 1
             continue
 
-        shares = _clean_num(m.group(1))
-        amount = _clean_num(m.group(3))
-        profit_str = m.group(4).replace('＋', '+').replace('－', '-')
-        profit = _clean_num(profit_str)
+        # 可能基金名跨两行（如"易方达中债3-5年\n国开行债券指数A"）
+        raw_name = line
+        next_i = i + 1
+        if next_i < len(lines):
+            nxt = lines[next_i].strip()
+            if _is_fund_name(nxt) and not _ALIPAY_LIST_AMOUNT_RE.match(nxt):
+                raw_name = raw_name + nxt
+                next_i += 1
 
-        raw_name = ''
-        for j in range(i - 1, max(i - 5, -1), -1):
-            candidate = lines[j].strip()
-            if candidate and len(candidate) >= 4 and not re.fullmatch(r'[\d.,%+\-\s元份额市值收益]+', candidate):
-                raw_name = candidate
+        # 接下来找：金额行 → 昨日收益行 → 持有收益率行
+        amount = yesterday = pct = None
+        j = next_i
+        while j < min(next_i + 6, len(lines)):
+            seg = lines[j].strip()
+            if amount is None and _ALIPAY_LIST_AMOUNT_RE.match(seg):
+                amount = _clean_num(seg)
+            elif amount is not None and yesterday is None and _ALIPAY_LIST_RETURN_RE.match(seg):
+                yesterday = _clean_num(seg)
+            elif amount is not None and pct is None and _ALIPAY_LIST_PCT_RE.match(seg):
+                pct = _clean_num(seg.rstrip('%'))
                 break
+            j += 1
 
-        if shares is None and amount is None:
+        if amount is not None:
+            filled = sum(v is not None for v in [amount, yesterday, pct])
+            confidence = 'high' if filled == 3 else ('medium' if filled >= 1 else 'low')
+            rows.append({
+                'raw_name': raw_name,
+                'shares': 0.0,          # 列表页不显示份额
+                'amount': amount,
+                'profit': 0.0,          # 列表页只有收益率，无绝对金额
+                'profit_pct': pct,
+                'confidence': confidence,
+            })
+            i = j + 1
+        else:
             i += 1
-            continue
-
-        filled = sum(v is not None for v in [shares, amount, profit])
-        confidence = 'high' if filled == 3 else ('medium' if filled == 2 else 'low')
-
-        rows.append({
-            'raw_name': raw_name,
-            'shares': shares or 0.0,
-            'amount': amount or 0.0,
-            'profit': profit or 0.0,
-            'confidence': confidence,
-        })
-        i += 2
 
     return rows
 
