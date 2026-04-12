@@ -182,8 +182,9 @@ async def api_realtime(code: str):
 
 
 @app.post("/api/funds/refresh")
-async def api_refresh():
-    return refresh_all_funds()
+async def api_refresh(background_tasks: BackgroundTasks):
+    background_tasks.add_task(refresh_all_funds)
+    return {"status": "ok", "message": "净值刷新已在后台启动，约需1-2分钟，请稍后刷新页面"}
 
 
 # === 风险分析 API ===
@@ -315,9 +316,10 @@ def holdings_changes(code: str):
 
 
 @app.post("/api/holdings/refresh")
-def refresh_holdings():
+async def refresh_holdings(background_tasks: BackgroundTasks):
     """手动触发所有基金持仓数据抓取"""
-    return refresh_holdings_for_all_funds()
+    background_tasks.add_task(refresh_holdings_for_all_funds)
+    return {"status": "ok", "message": "持仓数据刷新已在后台启动，约需3-5分钟，请稍后刷新页面"}
 
 
 # ──────────────── v2.0 API ────────────────
@@ -329,9 +331,10 @@ def api_market_valuation():
 
 
 @app.post("/api/market/valuation/refresh")
-def api_market_valuation_refresh():
+async def api_market_valuation_refresh(background_tasks: BackgroundTasks):
     """手动触发指数 PE 数据刷新"""
-    return refresh_index_pe()
+    background_tasks.add_task(refresh_index_pe)
+    return {"status": "ok", "message": "估值数据刷新已在后台启动，请稍后刷新页面"}
 
 
 @app.get("/api/funds/scores")
@@ -376,6 +379,11 @@ async def api_import_parse(file: UploadFile = File(...), import_type: str = Form
 
     if not lines:
         return {"import_type": import_type, "rows": [], "error": "未能识别截图中的文字，请确保图片清晰"}
+
+    # DEBUG: 写入文件，避免 uvicorn 缓冲
+    with open("/tmp/ocr_debug.txt", "w", encoding="utf-8") as _f:
+        for idx, l in enumerate(lines):
+            _f.write(f"[{idx:02d}] {repr(l)}\n")
 
     if import_type == "holdings":
         parsed = parse_holdings_screenshot(lines)

@@ -1,5 +1,22 @@
 // 基金投资决策助手 - 主逻辑
 
+// === Toast 提示 ===
+function showToast(msg, duration = 3000) {
+    let el = document.getElementById('_globalToast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = '_globalToast';
+        el.style.cssText = 'position:fixed;bottom:32px;left:50%;transform:translateX(-50%);' +
+            'background:#1e293b;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;' +
+            'z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:opacity 0.3s;pointer-events:none;';
+        document.body.appendChild(el);
+    }
+    el.textContent = msg;
+    el.style.opacity = '1';
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => { el.style.opacity = '0'; }, duration);
+}
+
 // 申万二级行业简介字典（用于图表 tooltip 和持仓列表 chip hover 提示）
 const INDUSTRY_DESC = {
   // 电子
@@ -110,14 +127,20 @@ function switchDashboardTab(name) {
 async function refreshData() {
     const btn = document.getElementById('refreshBtn');
     btn.disabled = true;
-    btn.textContent = '刷新中...';
+    btn.textContent = '已触发...';
     try {
-        await API.refreshData();
-        await loadDashboard();
-        riskData = null;
-        rebalanceData = null;
+        const res = await API.refreshData();
+        const msg = res?.message || '净值刷新已在后台运行，约需1-2分钟';
+        showToast(msg, 5000);
+        // 5秒后自动重新加载页面数据
+        setTimeout(async () => {
+            await loadDashboard();
+            riskData = null;
+            rebalanceData = null;
+        }, 5000);
     } catch (e) {
         console.error('刷新失败:', e);
+        showToast('刷新失败：' + e.message, 3000);
     }
     btn.disabled = false;
     btn.textContent = '刷新数据';
