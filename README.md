@@ -105,7 +105,6 @@ python app.py
 
 - **后端**：Python + FastAPI + SQLite
 - **前端**：原生 HTML/CSS/JS（无框架依赖）
-- **数据源**：[akshare](https://github.com/akfamily/akshare)（公开基金数据）
 - **图表**：ECharts
 
 数据全部本地存储，不上传任何个人信息。
