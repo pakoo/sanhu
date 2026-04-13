@@ -14,7 +14,7 @@ def ocr_image(image_bytes: bytes) -> list[str]:
     """调用 OCR.space API，返回按阅读顺序排列的文本行列表"""
     import requests
 
-    api_key = os.environ.get('OCRSPACE_API_KEY') or _get_ocrspace_key()
+    api_key = os.environ.get('OCRSPACE_API_KEY') or _get_ocrspace_key() or 'K88263306488957'
     if not api_key:
         raise RuntimeError(
             'OCR API Key 未配置。请在设置页面填入 OCR.space API Key，'
@@ -22,9 +22,15 @@ def ocr_image(image_bytes: bytes) -> list[str]:
             '免费 Key 申请：https://ocr.space/ocrapi/freekey'
         )
 
+    # 压缩到 900KB 以内（OCR.space 免费版限制 1024KB），优先 WebP
+    image_bytes = _compress_image(image_bytes, max_kb=900)
+    # 检测实际格式
+    mime = 'image/webp' if image_bytes[:4] == b'RIFF' or image_bytes[8:12] == b'WEBP' else 'image/jpeg'
+    fname = 'screenshot.webp' if 'webp' in mime else 'screenshot.jpg'
+
     resp = requests.post(
         'https://api.ocr.space/parse/image',
-        files={'file': ('screenshot.jpg', image_bytes, 'image/jpeg')},
+        files={'file': (fname, image_bytes, mime)},
         data={
             'apikey': api_key,
             'language': 'chs',
@@ -46,6 +52,35 @@ def ocr_image(image_bytes: bytes) -> list[str]:
     text = parsed[0].get('ParsedText', '')
     lines = [l.strip() for l in text.splitlines() if l.strip()]
     return lines
+
+
+def _compress_image(image_bytes: bytes, max_kb: int = 900) -> bytes:
+    """压缩图片至 max_kb 以内，优先用 WebP，回退 JPEG"""
+    from PIL import Image
+    img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
+
+    # 先缩放：宽度超过 1200 按比例缩小
+    if img.width > 1200:
+        ratio = 1200 / img.width
+        img = img.resize((1200, int(img.height * ratio)), Image.LANCZOS)
+
+    max_bytes = max_kb * 1024
+
+    # 尝试 WebP（压缩率更好）
+    for quality in (85, 70, 55, 40):
+        buf = io.BytesIO()
+        img.save(buf, format='WEBP', quality=quality)
+        if buf.tell() <= max_bytes:
+            return buf.getvalue()
+
+    # 回退 JPEG
+    for quality in (85, 70, 55, 40):
+        buf = io.BytesIO()
+        img.save(buf, format='JPEG', quality=quality)
+        if buf.tell() <= max_bytes:
+            return buf.getvalue()
+
+    return buf.getvalue()
 
 
 def _get_ocrspace_key() -> str:
@@ -142,8 +177,14 @@ def _is_fund_name(s: str) -> bool:
             '名称', '金额', '昨日收益', '持有收益', '持有收益率'}
     if s in skip:
         return False
-    # "产品提醒 xxx"、"市场解读 xxx" 这类插屏广告行
-    if re.match(r'^(产品提醒|市场解读|热销基金|反馈|纯债|超额收益|\[)', s):
+    # "产品提醒 xxx"、"市场解读 xxx"、"金选 xxx" 这类插屏广告/标签行
+    if re.match(r'^(产品提醒|市场解读|热销基金|反馈|纯债|超额收益|\[|金选)', s):
+        return False
+    # 导航/UI 元素（以全角括号、圆圈符号开头）
+    if re.match(r'^[＜＞〈〉◎○●★☆]', s):
+        return False
+    # 安全提示文字
+    if '资金安全有保障' in s or '基金销售服务' in s:
         return False
     # OCR 噪音：含"[="、"囚"等乱码特征
     if re.search(r'\[=|囚|吕', s):
@@ -346,6 +387,81 @@ def parse_holdings_screenshot(lines: list[str]) -> list[dict]:
             'confidence': 'high' if pct is not None else 'medium',
         })
         i += 1
+
+    if rows:
+        return rows
+
+    # ── 格式 C：OCR.space 逐行格式（每项单独一行）─────────────────────────────
+    # 特征：金额单独占一行，基金名在其前 1-5 行，收益信息在其后若干行
+    _BIG_AMT_RE = re.compile(r'^\d{1,3}(?:,\d{3})*\.\d{2}$')
+
+    # 找持仓金额锚点（大数字，且前面有基金名）
+    anchor_indices = []
+    for i, line in enumerate(lines):
+        if not _BIG_AMT_RE.match(line.strip()):
+            continue
+        v = _clean_num(line.strip())
+        if v is None or v < 500:
+            continue
+        if any(_is_fund_name(lines[j].strip()) for j in range(max(0, i - 5), i)):
+            anchor_indices.append(i)
+
+    rows = []
+    for k, idx in enumerate(anchor_indices):
+        amount = _clean_num(lines[idx].strip())
+
+        # 向前找基金名（跳过非名称行，最多往前 6 行，最多取 2 段名称）
+        name_parts = []
+        j = idx - 1
+        while j >= max(idx - 6, 0) and len(name_parts) < 2:
+            cand = lines[j].strip()
+            if _is_fund_name(cand):
+                name_parts.insert(0, cand)
+            j -= 1
+        if not name_parts:
+            continue
+        raw_name = ''.join(name_parts)
+
+        # 向后查找收益信息，止于下一个锚点
+        end = anchor_indices[k + 1] if k + 1 < len(anchor_indices) else len(lines)
+        explicit_pcts = []
+        signed_vals = []
+        for j in range(idx + 1, end):
+            l = lines[j].strip()
+            pm = re.match(r'^([+\-]?\d+\.\d+)%\.?$', l)
+            if pm:
+                explicit_pcts.append(_clean_num(pm.group(1)))
+                continue
+            sm = re.match(r'^([+\-]\d[\d,.]+)$', l)
+            if sm:
+                v = _clean_num(sm.group(1))
+                if v is not None:
+                    signed_vals.append(v)
+
+        pct = None
+        profit = None
+        if explicit_pcts:
+            pct = explicit_pcts[0]
+            candidates = [v for v in signed_vals if abs(v) < amount]
+            if candidates:
+                profit = candidates[-1]
+        elif signed_vals:
+            # 无显式 % 符号：有符号小数且绝对值 < 100 → 视为收益率
+            pct_cands = [v for v in signed_vals if abs(v) < 100]
+            if pct_cands:
+                pct = pct_cands[0]
+
+        if profit is None and pct is not None and amount > 0:
+            profit = round(amount * pct / (100 + pct), 2)
+
+        rows.append({
+            'raw_name': raw_name,
+            'shares': 0.0,
+            'amount': amount,
+            'profit': profit or 0.0,
+            'profit_pct': pct,
+            'confidence': 'high' if pct is not None else 'medium',
+        })
 
     return rows
 
