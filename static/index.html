@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>基金投资决策助手</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=20260412b">
+    <link rel="stylesheet" href="/static/css/style.css?v=20260413">
     <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
 </head>
 <body>
@@ -796,10 +796,20 @@
                 <div id="importPreview" style="display:none;margin-top:12px;text-align:center;">
                     <img id="importPreviewImg" style="max-height:180px;border-radius:8px;border:1px solid var(--border);object-fit:contain;">
                 </div>
+                <!-- OCR API Key 配置 -->
+                <div id="ocrKeySection" style="margin-top:12px;padding:10px 12px;background:#f8fafc;border-radius:8px;border:1px solid var(--border);font-size:13px;">
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span style="color:var(--text-secondary);white-space:nowrap;">OCR.space Key</span>
+                        <input id="ocrKeyInput" type="text" placeholder="填入 API Key（免费注册：ocr.space/ocrapi/freekey）"
+                            style="flex:1;min-width:200px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;font-family:monospace;">
+                        <button class="btn" onclick="saveOcrKey()" style="padding:4px 10px;font-size:12px;white-space:nowrap;">保存</button>
+                    </div>
+                    <div id="ocrKeySaveMsg" style="color:#16a34a;font-size:12px;margin-top:4px;display:none;">已保存</div>
+                </div>
                 <!-- 解析中 loading -->
                 <div id="importParseLoading" style="display:none;align-items:center;gap:10px;margin-top:12px;color:var(--text-secondary);font-size:13px;">
                     <div style="width:18px;height:18px;border:2px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
-                    正在识别截图，首次运行需加载模型（约几秒）...
+                    正在识别截图（通过 OCR.space 云端识别）...
                 </div>
                 <div id="importParseError" style="color:#ef4444;font-size:13px;margin-top:8px;display:none;"></div>
                 <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
@@ -834,15 +844,15 @@
         </div>
     </div>
 
-    <script src="/static/js/terms.js?v=20260412b"></script>
-    <script src="/static/js/tooltip.js?v=20260412b"></script>
-    <script src="/static/js/guide.js?v=20260412b"></script>
-    <script src="/static/js/api.js?v=20260412b"></script>
-    <script src="/static/js/app.js?v=20260412b"></script>
-    <script src="/static/js/watchlist.js?v=20260412b"></script>
-    <script src="/static/js/importer.js?v=20260412b"></script>
-    <script src="/static/js/selector.js?v=20260412b"></script>
-    <script src="/static/js/decisions.js?v=20260412b"></script>
-    <script src="/static/js/simulations.js?v=20260412b"></script>
+    <script src="/static/js/terms.js?v=20260413"></script>
+    <script src="/static/js/tooltip.js?v=20260413"></script>
+    <script src="/static/js/guide.js?v=20260413"></script>
+    <script src="/static/js/api.js?v=20260413"></script>
+    <script src="/static/js/app.js?v=20260413"></script>
+    <script src="/static/js/watchlist.js?v=20260413"></script>
+    <script src="/static/js/importer.js?v=20260413"></script>
+    <script src="/static/js/selector.js?v=20260413"></script>
+    <script src="/static/js/decisions.js?v=20260413"></script>
+    <script src="/static/js/simulations.js?v=20260413"></script>
 </body>
 </html>

@@ -550,7 +550,7 @@ def api_get_settings():
 @app.patch("/api/settings")
 def api_patch_settings(payload: dict):
     from backend.database import set_setting, get_all_settings
-    allowed = {"risk_level"}
+    allowed = {"risk_level", "ocrspace_api_key"}
     if not isinstance(payload, dict):
         return {"status": "error", "msg": "payload must be dict"}
     if "risk_level" in payload and payload["risk_level"] not in ("conservative", "moderate", "aggressive"):

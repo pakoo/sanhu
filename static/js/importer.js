@@ -23,6 +23,20 @@ function openImportModal() {
     });
 
     document.getElementById('importModal').style.display = 'flex';
+
+    // 读取已保存的 OCR Key 并填入输入框
+    API.getSettings().then(data => {
+        const key = data?.ocrspace_api_key || '';
+        document.getElementById('ocrKeyInput').value = key;
+    }).catch(() => {});
+}
+
+async function saveOcrKey() {
+    const key = document.getElementById('ocrKeyInput').value.trim();
+    await API.patchSettings({ ocrspace_api_key: key });
+    const msg = document.getElementById('ocrKeySaveMsg');
+    msg.style.display = 'block';
+    setTimeout(() => { msg.style.display = 'none'; }, 2000);
 }
 
 function closeImportModal(event) {

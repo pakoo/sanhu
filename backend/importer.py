@@ -3,62 +3,55 @@ from __future__ import annotations
 
 import difflib
 import io
+import os
 import re
 from typing import Optional
 
 from backend.database import get_connection
 
-# ── OCR 懒加载单例 ────────────────────────────────────────────────
-_reader = None
-
-
-def get_reader():
-    global _reader
-    if _reader is None:
-        import easyocr
-        _reader = easyocr.Reader(['ch_sim', 'en'], gpu=False, verbose=False)
-    return _reader
-
 
 def ocr_image(image_bytes: bytes) -> list[str]:
-    """运行 EasyOCR，返回按 y 坐标排序的文本行列表"""
-    import numpy as np
-    from PIL import Image
-    img = Image.open(io.BytesIO(image_bytes)).convert('RGB')
-    if img.width > 1200:
-        ratio = 1200 / img.width
-        img = img.resize((1200, int(img.height * ratio)))
+    """调用 OCR.space API，返回按阅读顺序排列的文本行列表"""
+    import requests
 
-    reader = get_reader()
-    results = reader.readtext(np.array(img))
+    api_key = os.environ.get('OCRSPACE_API_KEY') or _get_ocrspace_key()
+    if not api_key:
+        raise RuntimeError(
+            'OCR API Key 未配置。请在设置页面填入 OCR.space API Key，'
+            '或设置环境变量 OCRSPACE_API_KEY。'
+            '免费 Key 申请：https://ocr.space/ocrapi/freekey'
+        )
 
-    if not results:
+    resp = requests.post(
+        'https://api.ocr.space/parse/image',
+        files={'file': ('screenshot.jpg', image_bytes, 'image/jpeg')},
+        data={
+            'apikey': api_key,
+            'language': 'chs',
+            'isOverlayRequired': False,
+            'OCREngine': 2,
+        },
+        timeout=30,
+    )
+    resp.raise_for_status()
+    result = resp.json()
+
+    if result.get('IsErroredOnProcessing'):
+        raise RuntimeError(f"OCR.space 错误：{result.get('ErrorMessage', '未知错误')}")
+
+    parsed = result.get('ParsedResults', [])
+    if not parsed:
         return []
 
-    def y_center(item):
-        bbox = item[0]
-        return (bbox[0][1] + bbox[2][1]) / 2
-
-    def x_center(item):
-        bbox = item[0]
-        return (bbox[0][0] + bbox[2][0]) / 2
-
-    results.sort(key=y_center)
-
-    lines = []
-    current_line = [results[0]]
-    for item in results[1:]:
-        if abs(y_center(item) - y_center(current_line[0])) < 15:
-            current_line.append(item)
-        else:
-            current_line.sort(key=x_center)
-            lines.append(' '.join(r[1] for r in current_line))
-            current_line = [item]
-    if current_line:
-        current_line.sort(key=x_center)
-        lines.append(' '.join(r[1] for r in current_line))
-
+    text = parsed[0].get('ParsedText', '')
+    lines = [l.strip() for l in text.splitlines() if l.strip()]
     return lines
+
+
+def _get_ocrspace_key() -> str:
+    """从 user_settings 读取 OCR.space API Key"""
+    from backend.database import get_setting
+    return get_setting('ocrspace_api_key') or ''
 
 
 _HOLDINGS_RE = re.compile(

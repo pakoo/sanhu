@@ -64,6 +64,16 @@ const API = {
         return fetch(`/api/watchlist/${code}`, { method: 'DELETE' }).then(r => r.json());
     },
 
+    // 设置
+    getSettings() { return this.get('/api/settings').then(r => r.data || {}); },
+    patchSettings(data) {
+        return fetch('/api/settings', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        }).then(r => r.json());
+    },
+
     // 截图导入
     parseImport(formData) {
         // 不设 Content-Type，让浏览器自动处理 multipart boundary
