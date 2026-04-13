@@ -82,17 +82,17 @@ def main():
     for t in MARKET_TABLES:
         try:
             n = conn.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0]
-            status = '✓' if n > 0 else '○'
+            status = '[OK]' if n > 0 else '[-]'
             print(f'    {status} {t}: {n} 行')
         except sqlite3.OperationalError:
-            print(f'    ✗ {t}: 表不存在')
+            print(f'    [--] {t}: 表不存在')
     print('  用户数据（空，等待录入）:')
     for t in USER_TABLES:
         try:
             n = conn.execute(f'SELECT COUNT(*) FROM {t}').fetchone()[0]
-            print(f'    ○ {t}: {n} 行')
+            print(f'    [-] {t}: {n} 行')
         except sqlite3.OperationalError:
-            print(f'    ✗ {t}: 表不存在')
+            print(f'    [--] {t}: 表不存在')
     conn.close()
 
     print('\n初始化完成！运行以下命令启动服务：')
