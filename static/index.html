@@ -844,5 +844,110 @@
     <script src="/static/js/selector.js?v=20260413"></script>
     <script src="/static/js/decisions.js?v=20260413"></script>
     <script src="/static/js/simulations.js?v=20260413"></script>
+
+<!-- ── 微信浮动入口 ───────────────────────────────────────────── -->
+<div id="wxWidget">
+  <div id="wxCard">
+    <button id="wxClose" onclick="wxCollapse()" title="关闭">✕</button>
+    <img src="https://hairtok.oss-cn-shanghai.aliyuncs.com/sanhu/QRcode.jpg" alt="微信二维码" id="wxQR">
+    <div id="wxLabel">AI 订阅互助群</div>
+    <div id="wxSub">微信扫码加入</div>
+  </div>
+  <button id="wxBtn" onclick="wxExpand()">互助群</button>
+</div>
+
+<style>
+#wxWidget {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+#wxCard {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 16px 14px 12px;
+  width: 200px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.13);
+  position: relative;
+  animation: wxFadeIn 0.18s ease;
+}
+@keyframes wxFadeIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+#wxClose {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px;
+}
+#wxClose:hover { color: #374151; }
+#wxQR {
+  width: 168px;
+  height: 168px;
+  object-fit: contain;
+  border-radius: 8px;
+  display: block;
+  margin: 0 auto 8px;
+}
+#wxLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 3px;
+}
+#wxSub {
+  font-size: 11px;
+  color: #6b7280;
+}
+#wxBtn {
+  background: #22c55e;
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(34,197,94,0.35);
+  transition: background 0.15s;
+}
+#wxBtn:hover { background: #16a34a; }
+</style>
+
+<script>
+(function() {
+  // 默认关闭，只有用户主动打开过才展开
+  var opened = localStorage.getItem('wx_widget_opened') === '1';
+  if (!opened) {
+    document.getElementById('wxCard').style.display = 'none';
+  }
+})();
+function wxCollapse() {
+  document.getElementById('wxCard').style.display = 'none';
+  localStorage.setItem('wx_widget_opened', '0');
+}
+function wxExpand() {
+  var card = document.getElementById('wxCard');
+  card.style.display = 'block';
+  card.style.animation = 'none';
+  card.offsetHeight; // reflow
+  card.style.animation = '';
+  localStorage.setItem('wx_widget_opened', '1');
+}
+</script>
 </body>
 </html>
