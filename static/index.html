@@ -252,9 +252,10 @@
                     <div class="value" id="overlapCount">--</div>
                     <div class="sub text-neutral">跨多只基金持有</div>
                 </div>
-                <div class="summary-card" style="justify-content:center;gap:8px;">
+                <div class="summary-card" style="justify-content:center;gap:8px;flex-direction:column;align-items:center;">
                     <button class="btn btn-primary" id="refreshHoldingsBtn" onclick="refreshHoldingsData()">抓取持仓数据</button>
                     <div class="sub text-neutral" style="font-size:11px;">约需 30 秒，抓取季报</div>
+                    <div id="holdingsLogPanel" style="display:none;width:100%;text-align:left;background:#f8fafc;border:1px solid #e5e7eb;border-radius:8px;padding:8px 10px;font-size:12px;font-family:monospace;max-height:140px;overflow-y:auto;"></div>
                 </div>
             </div>
 

@@ -596,12 +596,20 @@ def fetch_fund_industry(code: str, save: bool = True) -> list[dict]:
     return results
 
 
-def refresh_holdings_for_all_funds() -> dict:
+def refresh_holdings_for_all_funds(log_cb=None) -> dict:
     """批量刷新所有权益类基金的持仓和行业数据
+
+    Args:
+        log_cb: 可选回调 log_cb(msg: str)，每步进度推送给调用方
 
     Returns:
         {"refreshed": [...], "skipped": [...], "errors": [...]}
     """
+    def _log(msg: str):
+        print(msg)
+        if log_cb:
+            log_cb(msg)
+
     conn = get_connection()
     funds = conn.execute("SELECT code, category FROM funds").fetchall()
     conn.close()
@@ -613,19 +621,24 @@ def refresh_holdings_for_all_funds() -> dict:
     for fund in funds:
         code = fund["code"]
         category = fund["category"]
-        
+
         if category == "bond":
             skipped.append(code)
+            _log(f"— {code} 跳过（债券型）")
             continue
-        
+
+        _log(f"⏳ {code} 抓取中...")
         try:
             fetch_fund_holdings(code)
             time.sleep(REQUEST_DELAY)
             fetch_fund_industry(code)
             time.sleep(REQUEST_DELAY)
             refreshed.append(code)
+            _log(f"✓ {code} 完成")
         except Exception as e:
             print(f"刷新 {code} 持仓失败: {e}")
             errors.append(code)
+            _log(f"✗ {code} 失败：{e}")
 
+    _log(f"完成 {len(refreshed)} 只 / 跳过 {len(skipped)} 只债券 / 失败 {len(errors)} 只")
     return {"refreshed": refreshed, "skipped": skipped, "errors": errors}

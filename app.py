@@ -253,6 +253,47 @@ async def api_backtest_portfolio(req: PortfolioBacktestRequest):
 
 # ──────────────── 持仓透视 ────────────────
 
+# 注意：字面量路由必须在 {code} 参数路由之前注册，否则 Starlette 会优先匹配参数路由
+_holdings_task: dict = {"running": False, "logs": [], "done": False, "result": None}
+
+
+def _run_holdings_refresh():
+    global _holdings_task
+    def _log(msg: str):
+        _holdings_task["logs"].append(msg)
+    try:
+        result = refresh_holdings_for_all_funds(log_cb=_log)
+        _holdings_task["result"] = result
+    except Exception as e:
+        _holdings_task["logs"].append(f"✗ 任务异常中断：{e}")
+        _holdings_task["result"] = None
+    finally:
+        _holdings_task["running"] = False
+        _holdings_task["done"] = True
+
+
+@app.post("/api/holdings/refresh")
+async def refresh_holdings(background_tasks: BackgroundTasks):
+    """手动触发所有基金持仓数据抓取"""
+    global _holdings_task
+    if _holdings_task["running"]:
+        return {"status": "running", "message": "抓取任务正在进行中，请稍候"}
+    _holdings_task = {"running": True, "logs": [], "done": False, "result": None}
+    background_tasks.add_task(_run_holdings_refresh)
+    return {"status": "ok", "message": "抓取已启动"}
+
+
+@app.get("/api/holdings/refresh/status")
+async def holdings_refresh_status():
+    """查询持仓抓取任务的当前状态和日志"""
+    return {
+        "running": _holdings_task["running"],
+        "logs": list(_holdings_task["logs"]),
+        "done": _holdings_task["done"],
+        "result": _holdings_task["result"],
+    }
+
+
 @app.get("/api/holdings/{code}/stocks")
 def get_fund_stocks(code: str):
     """单基金最新持仓股票列表"""
@@ -313,13 +354,6 @@ def holdings_industry_total():
 def holdings_changes(code: str):
     """单基金持仓变化对比（最近两期）"""
     return get_holdings_changes(code)
-
-
-@app.post("/api/holdings/refresh")
-async def refresh_holdings(background_tasks: BackgroundTasks):
-    """手动触发所有基金持仓数据抓取"""
-    background_tasks.add_task(refresh_holdings_for_all_funds)
-    return {"status": "ok", "message": "持仓数据刷新已在后台启动，约需3-5分钟，请稍后刷新页面"}
 
 
 # ──────────────── v2.0 API ────────────────

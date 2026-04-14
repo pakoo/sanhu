@@ -1133,18 +1133,49 @@ function renderIndustryBreakdown(data) {
 
 async function refreshHoldingsData() {
     const btn = document.getElementById('refreshHoldingsBtn');
+    const logPanel = document.getElementById('holdingsLogPanel');
     btn.disabled = true;
     btn.textContent = '抓取中...';
+    logPanel.innerHTML = '';
+    logPanel.style.display = 'block';
+
     try {
-        const result = await API.refreshHoldings();
-        console.log('持仓抓取结果:', result);
-        holdingsData = null;
-        await loadHoldings();
+        await API.refreshHoldings();
     } catch (e) {
-        console.error('抓取持仓失败:', e);
+        logPanel.innerHTML = `<div style="color:#dc2626">✗ 启动失败：${e}</div>`;
+        btn.disabled = false;
+        btn.textContent = '抓取持仓数据';
+        return;
     }
-    btn.disabled = false;
-    btn.textContent = '抓取持仓数据';
+
+    const poll = setInterval(async () => {
+        let s;
+        try {
+            s = await API.getHoldingsStatus();
+        } catch (e) {
+            return; // 网络抖动时跳过本次轮询，不停止
+        }
+
+        logPanel.innerHTML = s.logs.map(l => {
+            let color = '#374151';
+            if (l.startsWith('✓')) color = '#16a34a';
+            else if (l.startsWith('✗')) color = '#dc2626';
+            else if (l.startsWith('—')) color = '#9ca3af';
+            else if (l.startsWith('完成')) color = '#1d4ed8';
+            return `<div style="color:${color};line-height:1.6">${l}</div>`;
+        }).join('');
+        logPanel.scrollTop = logPanel.scrollHeight;
+
+        if (!s.running) {
+            clearInterval(poll);
+            btn.disabled = false;
+            btn.textContent = '抓取持仓数据';
+            if (s.result && s.result.refreshed && s.result.refreshed.length > 0) {
+                holdingsData = null;
+                await loadHoldings();
+            }
+        }
+    }, 1500);
 }
 
 // === v2.0: 市场估值信号 ===

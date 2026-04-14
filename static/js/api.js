@@ -49,6 +49,7 @@ const API = {
     getIndustryTotal() { return this.get('/api/holdings/industry-total'); },
     getHoldingsChanges(code) { return this.get(`/api/holdings/${code}/changes`); },
     refreshHoldings() { return this.post('/api/holdings/refresh'); },
+    getHoldingsStatus() { return this.get('/api/holdings/refresh/status'); },
 
     // v2.0
     getMarketValuation() { return this.get('/api/market/valuation'); },
