@@ -55,9 +55,12 @@
   <div id="upLogBox" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:12px;font-family:monospace;max-height:130px;overflow-y:auto;line-height:1.7;"></div>
   <button id="upActionBtn" onclick="startUpdate()"
     style="display:none;width:100%;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;background:#22c55e;color:white;">⬇ 立即更新</button>
-  <div style="text-align:center;margin-top:12px;">
+  <div style="display:flex;justify-content:center;gap:16px;margin-top:12px;">
     <a id="upChangelogLink" href="https://github.com/pakoo/sanhu/releases" target="_blank"
-      style="font-size:12px;color:#94a3b8;text-decoration:none;">查看更新日志 ↗</a>
+      style="font-size:12px;color:#94a3b8;text-decoration:none;">更新日志 ↗</a>
+    <span style="color:#e2e8f0;">|</span>
+    <a href="https://github.com/pakoo/sanhu" target="_blank"
+      style="font-size:12px;color:#94a3b8;text-decoration:none;">GitHub 项目主页 ↗</a>
   </div>
 </div>
 <div id="upOverlay" onclick="closeUpdatePanel()" style="display:none;position:fixed;inset:0;z-index:9400;"></div>
