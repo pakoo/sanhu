@@ -170,6 +170,47 @@ async def api_search(q: str = ""):
     return search_fund(q)
 
 
+# 注意：字面量路由必须在 {code} 参数路由之前注册
+_refresh_task: dict = {"running": False, "done": False, "done_count": 0, "total": 0, "errors": []}
+
+
+def _run_refresh_all():
+    global _refresh_task
+    def _log(done, total, code, error=None):
+        _refresh_task["done_count"] = done
+        _refresh_task["total"] = total
+        if error:
+            _refresh_task["errors"].append({"code": code, "error": error})
+    try:
+        refresh_all_funds(log_cb=_log)
+    except Exception as e:
+        _refresh_task["errors"].append({"code": "unknown", "error": str(e)})
+    finally:
+        _refresh_task["running"] = False
+        _refresh_task["done"] = True
+
+
+@app.post("/api/funds/refresh")
+async def api_refresh(background_tasks: BackgroundTasks):
+    global _refresh_task
+    if _refresh_task["running"]:
+        return {"status": "running", "message": "刷新任务正在进行中"}
+    _refresh_task = {"running": True, "done": False, "done_count": 0, "total": 0, "errors": []}
+    background_tasks.add_task(_run_refresh_all)
+    return {"status": "ok", "message": "净值刷新已启动"}
+
+
+@app.get("/api/funds/refresh/status")
+async def api_refresh_status():
+    return {
+        "running": _refresh_task["running"],
+        "done": _refresh_task["done"],
+        "done_count": _refresh_task["done_count"],
+        "total": _refresh_task["total"],
+        "errors": list(_refresh_task["errors"]),
+    }
+
+
 @app.get("/api/funds/{code}/nav")
 async def api_nav(code: str, days: int = 365):
     return get_nav_history(code, days)
@@ -179,12 +220,6 @@ async def api_nav(code: str, days: int = 365):
 async def api_realtime(code: str):
     result = fetch_realtime_estimate(code)
     return result or {"error": "暂无实时数据"}
-
-
-@app.post("/api/funds/refresh")
-async def api_refresh(background_tasks: BackgroundTasks):
-    background_tasks.add_task(refresh_all_funds)
-    return {"status": "ok", "message": "净值刷新已在后台启动，约需1-2分钟，请稍后刷新页面"}
 
 
 # === 风险分析 API ===

@@ -24,6 +24,7 @@ const API = {
     getNav(code, days = 365) { return this.get(`/api/funds/${code}/nav?days=${days}`); },
     getRealtime(code) { return this.get(`/api/funds/${code}/realtime`); },
     refreshData() { return this.post('/api/funds/refresh'); },
+    getRefreshStatus() { return this.get('/api/funds/refresh/status'); },
 
     // 风险分析
     getRiskAnalysis() { return this.get('/api/risk/analysis'); },

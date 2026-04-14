@@ -399,8 +399,11 @@ def search_fund(keyword: str) -> list[dict]:
         return []
 
 
-def refresh_all_funds() -> dict:
+def refresh_all_funds(log_cb=None) -> dict:
     """刷新所有持仓基金的净值和详情数据
+
+    Args:
+        log_cb: 可选回调 log_cb(done, total, code, error=None)
 
     Returns:
         {"refreshed": ["007171", ...], "errors": ["006195", ...]}
@@ -420,22 +423,27 @@ def refresh_all_funds() -> dict:
 
     refreshed = []
     errors = []
+    total = len(funds)
 
-    for fund in funds:
+    # 立即广播总数，让前端进度条知道分母
+    if log_cb:
+        log_cb(0, total, '', error=None)
+
+    for i, fund in enumerate(funds):
         code = fund["code"]
         try:
-            # 获取详情
             fetch_fund_detail(code)
             time.sleep(REQUEST_DELAY)
-
-            # 获取最新净值
             fetch_nav_history(code)
             time.sleep(REQUEST_DELAY)
-
             refreshed.append(code)
+            if log_cb:
+                log_cb(i + 1, total, code, error=None)
         except Exception as e:
             print(f"刷新 {code} 失败: {e}")
-            errors.append(code)
+            errors.append({"code": code, "error": str(e)})
+            if log_cb:
+                log_cb(i + 1, total, code, error=str(e))
 
     return {"refreshed": refreshed, "errors": errors}
 

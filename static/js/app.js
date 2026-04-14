@@ -1,16 +1,17 @@
 // 基金投资决策助手 - 主逻辑
 
 // === Toast 提示 ===
-function showToast(msg, duration = 3000) {
+function showToast(msg, duration = 3000, type = 'info') {
     let el = document.getElementById('_globalToast');
     if (!el) {
         el = document.createElement('div');
         el.id = '_globalToast';
         el.style.cssText = 'position:fixed;bottom:32px;left:50%;transform:translateX(-50%);' +
-            'background:#1e293b;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;' +
+            'color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;' +
             'z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,0.3);transition:opacity 0.3s;pointer-events:none;';
         document.body.appendChild(el);
     }
+    el.style.background = type === 'error' ? '#dc2626' : '#1e293b';
     el.textContent = msg;
     el.style.opacity = '1';
     clearTimeout(el._timer);
@@ -126,24 +127,57 @@ function switchDashboardTab(name) {
 // === 数据刷新 ===
 async function refreshData() {
     const btn = document.getElementById('refreshBtn');
+    const progress = document.getElementById('refreshProgress');
+    const bar = document.getElementById('refreshProgressBar');
+
     btn.disabled = true;
-    btn.textContent = '已触发...';
+    btn.textContent = '刷新中...';
+    progress.style.display = 'block';
+    bar.style.width = '5%';
+
     try {
-        const res = await API.refreshData();
-        const msg = res?.message || '净值刷新已在后台运行，约需1-2分钟';
-        showToast(msg, 5000);
-        // 5秒后自动重新加载页面数据
-        setTimeout(async () => {
-            await loadDashboard();
+        await API.refreshData();
+    } catch (e) {
+        showToast('刷新失败：' + e.message, 4000, 'error');
+        btn.disabled = false;
+        btn.textContent = '刷新数据';
+        progress.style.display = 'none';
+        return;
+    }
+
+    const poll = setInterval(async () => {
+        let s;
+        try { s = await API.getRefreshStatus(); } catch (e) { return; }
+
+        const pct = s.total > 0 ? Math.round((s.done_count / s.total) * 90) + 5 : 5;
+        bar.style.width = pct + '%';
+        if (s.total > 0) {
+            btn.textContent = `刷新中 ${s.done_count}/${s.total}`;
+        }
+
+        if (!s.running) {
+            clearInterval(poll);
+            bar.style.width = '100%';
+
+            if (s.errors && s.errors.length > 0) {
+                const codes = s.errors.map(e => e.code).join('、');
+                showToast(`完成 ${s.done_count} 只，${s.errors.length} 只失败：${codes}`, 6000, 'error');
+            } else {
+                showToast(`完成，已刷新 ${s.done_count} 只基金`, 3000);
+            }
+
+            setTimeout(async () => {
+                progress.style.display = 'none';
+                bar.style.width = '0%';
+            }, 600);
+
+            btn.disabled = false;
+            btn.textContent = '刷新数据';
             riskData = null;
             rebalanceData = null;
-        }, 5000);
-    } catch (e) {
-        console.error('刷新失败:', e);
-        showToast('刷新失败：' + e.message, 3000);
-    }
-    btn.disabled = false;
-    btn.textContent = '刷新数据';
+            await loadDashboard();
+        }
+    }, 1500);
 }
 
 // === Tab 1: 总览 ===
