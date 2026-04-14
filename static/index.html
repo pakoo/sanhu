@@ -12,29 +12,30 @@
     <nav class="navbar">
         <div class="container">
             <h1>基金投资决策助手</h1>
-            <div style="position:relative;display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
                 <button class="refresh-btn" id="refreshBtn" onclick="refreshData()">更新净值</button>
                 <div id="refreshTimestamp" style="font-size:11px;color:rgba(255,255,255,0.65);white-space:nowrap;"></div>
-                <!-- 浮动进度卡 -->
-                <div id="refreshCard" style="display:none;position:absolute;top:calc(100% + 10px);right:0;
-                    width:280px;background:#fff;border-radius:12px;padding:14px 16px;
-                    box-shadow:0 8px 28px rgba(0,0,0,0.18);z-index:1000;color:#111;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                        <span id="rcTitle" style="font-size:13px;font-weight:700;">更新中…</span>
-                        <span id="rcPct" style="font-size:12px;color:#6b7280;"></span>
-                    </div>
-                    <div style="height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden;margin-bottom:10px;">
-                        <div id="rcBar" style="height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#818cf8);
-                            border-radius:3px;transition:width 0.35s ease;"></div>
-                    </div>
-                    <div id="rcChips" style="display:flex;flex-wrap:wrap;gap:4px;min-height:22px;"></div>
-                    <div style="font-size:11px;color:#9ca3af;margin-top:10px;padding-top:8px;border-top:1px solid #f1f5f9;">
-                        更新所有基金最新净值 · 每日 15:30 自动更新
-                    </div>
-                </div>
             </div>
         </div>
     </nav>
+
+    <!-- 底部状态栏（刷新进度） -->
+    <div id="refreshStatusBar" style="display:none;position:fixed;bottom:0;left:0;right:0;height:44px;
+        background:#fff;border-top:2px solid #6366f1;z-index:8000;
+        align-items:center;padding:0 16px;gap:10px;
+        box-shadow:0 -2px 16px rgba(0,0,0,0.1);">
+        <span id="rsbLabel" style="font-size:13px;font-weight:600;color:#374151;white-space:nowrap;">更新净值</span>
+        <div style="flex:0 0 140px;height:5px;background:#e5e7eb;border-radius:3px;overflow:hidden;">
+            <div id="rsbBar" style="height:100%;width:0%;background:linear-gradient(90deg,#6366f1,#818cf8);
+                border-radius:3px;transition:width 0.4s ease;"></div>
+        </div>
+        <span id="rsbCount" style="font-size:12px;color:#6b7280;white-space:nowrap;"></span>
+        <div id="rsbChips" style="flex:1;display:flex;flex-wrap:nowrap;gap:4px;overflow:hidden;"></div>
+        <span style="font-size:11px;color:#9ca3af;white-space:nowrap;margin-left:auto;">每日 15:30 自动更新</span>
+        <button onclick="document.getElementById('refreshStatusBar').style.display='none';"
+            style="background:none;border:none;cursor:pointer;color:#9ca3af;font-size:16px;
+            padding:4px 4px 4px 12px;line-height:1;flex-shrink:0;">✕</button>
+    </div>
 
     <!-- Tab导航 -->
     <div class="tabs">
