@@ -125,23 +125,57 @@ function switchDashboardTab(name) {
 }
 
 // === 数据刷新 ===
+function _renderRefreshTimestamp(isoStr) {
+    const el = document.getElementById('refreshTimestamp');
+    if (!el) return;
+    if (!isoStr) { el.innerHTML = ''; return; }
+    const dt = new Date(isoStr);
+    const diffHrs = (Date.now() - dt) / 3600000;
+    const timeStr = dt.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    const dotColor = diffHrs < 1 ? '#86efac' : diffHrs < 8 ? '#fcd34d' : 'rgba(255,255,255,0.35)';
+    el.innerHTML = `<span style="color:${dotColor}">●</span> ${timeStr} 已更新`;
+}
+
+async function loadRefreshTimestamp() {
+    try {
+        const s = await API.getRefreshStatus();
+        _renderRefreshTimestamp(s.last_refresh_at);
+    } catch (e) {}
+}
+
 async function refreshData() {
     const btn = document.getElementById('refreshBtn');
-    const progress = document.getElementById('refreshProgress');
-    const bar = document.getElementById('refreshProgressBar');
+    const card = document.getElementById('refreshCard');
+    const rcTitle = document.getElementById('rcTitle');
+    const rcPct = document.getElementById('rcPct');
+    const rcBar = document.getElementById('rcBar');
+    const rcChips = document.getElementById('rcChips');
 
     btn.disabled = true;
-    btn.textContent = '刷新中...';
-    progress.style.display = 'block';
-    bar.style.width = '5%';
+    btn.textContent = '更新中…';
+    rcTitle.textContent = '更新中…';
+    rcPct.textContent = '';
+    rcBar.style.width = '0%';
+    rcChips.innerHTML = '';
+    card.style.display = 'block';
+
+    // click outside to close card (but keep polling)
+    const closeCard = (e) => {
+        if (!card.contains(e.target) && e.target !== btn) {
+            card.style.display = 'none';
+            btn.onclick = () => { card.style.display = 'block'; };
+        }
+    };
+    setTimeout(() => document.addEventListener('click', closeCard, { once: true }), 100);
 
     try {
         await API.refreshData();
     } catch (e) {
-        showToast('刷新失败：' + e.message, 4000, 'error');
+        card.style.display = 'none';
+        showToast('更新失败：' + e.message, 4000, 'error');
         btn.disabled = false;
-        btn.textContent = '刷新数据';
-        progress.style.display = 'none';
+        btn.textContent = '更新净值';
+        btn.onclick = refreshData;
         return;
     }
 
@@ -150,29 +184,44 @@ async function refreshData() {
         try { s = await API.getRefreshStatus(); } catch (e) { return; }
 
         const pct = s.total > 0 ? Math.round((s.done_count / s.total) * 90) + 5 : 5;
-        bar.style.width = pct + '%';
-        if (s.total > 0) {
-            btn.textContent = `刷新中 ${s.done_count}/${s.total}`;
+        rcBar.style.width = pct + '%';
+        rcPct.textContent = s.total > 0 ? `${s.done_count}/${s.total}` : '';
+        if (s.total > 0) rcTitle.textContent = `更新中 ${s.done_count}/${s.total}`;
+
+        // render chips (last 8)
+        if (s.recent && s.recent.length > 0) {
+            rcChips.innerHTML = s.recent.slice(-8).map(r => {
+                const bg = r.ok ? '#dcfce7' : '#fee2e2';
+                const fg = r.ok ? '#16a34a' : '#dc2626';
+                const icon = r.ok ? '✓' : '✗';
+                return `<span style="background:${bg};color:${fg};font-size:11px;padding:2px 6px;border-radius:4px;">${r.code} ${icon}</span>`;
+            }).join('');
         }
 
         if (!s.running) {
             clearInterval(poll);
-            bar.style.width = '100%';
+            rcBar.style.width = '100%';
 
-            if (s.errors && s.errors.length > 0) {
-                const codes = s.errors.map(e => e.code).join('、');
-                showToast(`完成 ${s.done_count} 只，${s.errors.length} 只失败：${codes}`, 6000, 'error');
+            const hasErr = s.errors && s.errors.length > 0;
+            if (hasErr) {
+                rcTitle.textContent = `⚠ ${s.errors.length} 只失败`;
+                rcTitle.style.color = '#dc2626';
             } else {
-                showToast(`完成，已刷新 ${s.done_count} 只基金`, 3000);
+                rcTitle.textContent = `✓ 已更新 ${s.done_count} 只净值`;
+                rcTitle.style.color = '#16a34a';
+            }
+            rcPct.textContent = '';
+
+            _renderRefreshTimestamp(s.last_refresh_at);
+
+            // auto-close card after 3s if no error
+            if (!hasErr) {
+                setTimeout(() => { card.style.display = 'none'; }, 3000);
             }
 
-            setTimeout(async () => {
-                progress.style.display = 'none';
-                bar.style.width = '0%';
-            }, 600);
-
             btn.disabled = false;
-            btn.textContent = '刷新数据';
+            btn.textContent = '更新净值';
+            btn.onclick = refreshData;
             riskData = null;
             rebalanceData = null;
             await loadDashboard();
@@ -1361,3 +1410,4 @@ async function submitTransaction() {
 
 // === 初始化 ===
 loadDashboard();
+loadRefreshTimestamp();

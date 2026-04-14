@@ -171,18 +171,28 @@ async def api_search(q: str = ""):
 
 
 # 注意：字面量路由必须在 {code} 参数路由之前注册
-_refresh_task: dict = {"running": False, "done": False, "done_count": 0, "total": 0, "errors": []}
+_refresh_task: dict = {
+    "running": False, "done": False, "done_count": 0, "total": 0,
+    "errors": [], "recent": [], "last_refresh_at": None,
+}
 
 
 def _run_refresh_all():
     global _refresh_task
+    from datetime import datetime, timezone
     def _log(done, total, code, error=None):
         _refresh_task["done_count"] = done
         _refresh_task["total"] = total
+        if code:
+            entry = {"code": code, "ok": error is None}
+            _refresh_task["recent"].append(entry)
+            if len(_refresh_task["recent"]) > 10:
+                _refresh_task["recent"] = _refresh_task["recent"][-10:]
         if error:
             _refresh_task["errors"].append({"code": code, "error": error})
     try:
         refresh_all_funds(log_cb=_log)
+        _refresh_task["last_refresh_at"] = datetime.now(timezone.utc).isoformat()
     except Exception as e:
         _refresh_task["errors"].append({"code": "unknown", "error": str(e)})
     finally:
@@ -195,7 +205,11 @@ async def api_refresh(background_tasks: BackgroundTasks):
     global _refresh_task
     if _refresh_task["running"]:
         return {"status": "running", "message": "刷新任务正在进行中"}
-    _refresh_task = {"running": True, "done": False, "done_count": 0, "total": 0, "errors": []}
+    prev_last = _refresh_task.get("last_refresh_at")
+    _refresh_task = {
+        "running": True, "done": False, "done_count": 0, "total": 0,
+        "errors": [], "recent": [], "last_refresh_at": prev_last,
+    }
     background_tasks.add_task(_run_refresh_all)
     return {"status": "ok", "message": "净值刷新已启动"}
 
@@ -208,6 +222,8 @@ async def api_refresh_status():
         "done_count": _refresh_task["done_count"],
         "total": _refresh_task["total"],
         "errors": list(_refresh_task["errors"]),
+        "recent": list(_refresh_task["recent"]),
+        "last_refresh_at": _refresh_task["last_refresh_at"],
     }
 
 
