@@ -1389,9 +1389,144 @@ async function submitTransaction() {
     }
 }
 
+// === 软件版本 & 自动更新 ===
+
+async function initVersionBadge() {
+    try {
+        const d = await (await fetch('/api/system/version')).json();
+        const ver = d.git_tag || `v${d.version}`;
+        document.getElementById('vBadgeText').textContent = ver;
+        document.getElementById('upCurrentVer').textContent = ver;
+        if (d.changelog_url) document.getElementById('upChangelogLink').href = d.changelog_url;
+    } catch (e) {}
+    checkForUpdate();
+}
+
+async function checkForUpdate() {
+    const btn = document.getElementById('upRefreshBtn');
+    if (btn) { btn.style.color = '#3b82f6'; btn.textContent = '⟳'; }
+    try {
+        const d = await (await fetch('/api/system/check-update')).json();
+        const dot = document.getElementById('vBadgeDot');
+        const latestRow = document.getElementById('upLatestRow');
+        const newBanner = document.getElementById('upNewBanner');
+        const latestNotice = document.getElementById('upLatestNotice');
+        const actionBtn = document.getElementById('upActionBtn');
+        if (d.latest) latestRow.textContent = `最新版本: ${d.latest}`;
+        if (d.changelog_url) document.getElementById('upChangelogLink').href = d.changelog_url;
+        if (d.has_update) {
+            dot.style.color = '#fb923c';
+            newBanner.style.display = 'block';
+            document.getElementById('upNewVer').textContent = d.latest;
+            latestNotice.style.display = 'none';
+            actionBtn.style.display = 'block';
+            actionBtn.style.background = '#22c55e';
+            actionBtn.textContent = '⬇ 立即更新';
+            actionBtn.disabled = false;
+            actionBtn.onclick = startUpdate;
+        } else if (!d.error) {
+            dot.style.color = 'rgba(255,255,255,0.4)';
+            newBanner.style.display = 'none';
+            latestNotice.style.display = 'block';
+            actionBtn.style.display = 'none';
+        }
+    } catch (e) {}
+    if (btn) { btn.style.color = '#94a3b8'; btn.textContent = '↻'; }
+}
+
+function toggleUpdatePanel(e) {
+    e.stopPropagation();
+    const panel = document.getElementById('updatePanel');
+    const overlay = document.getElementById('upOverlay');
+    if (panel.style.display !== 'none') {
+        closeUpdatePanel();
+    } else {
+        const rect = document.getElementById('versionBadge').getBoundingClientRect();
+        panel.style.top = (rect.bottom + 6) + 'px';
+        panel.style.left = rect.left + 'px';
+        panel.style.display = 'block';
+        overlay.style.display = 'block';
+    }
+}
+
+function closeUpdatePanel() {
+    const p = document.getElementById('updatePanel');
+    const o = document.getElementById('upOverlay');
+    if (p) p.style.display = 'none';
+    if (o) o.style.display = 'none';
+}
+
+async function startUpdate() {
+    const actionBtn = document.getElementById('upActionBtn');
+    const logBox = document.getElementById('upLogBox');
+    actionBtn.disabled = true;
+    actionBtn.textContent = '更新中...';
+    logBox.innerHTML = '';
+    logBox.style.display = 'block';
+    try {
+        await fetch('/api/system/update', { method: 'POST' });
+    } catch (e) {
+        showToast('启动更新失败', 3000, 'error');
+        actionBtn.disabled = false;
+        actionBtn.textContent = '⬇ 立即更新';
+        return;
+    }
+    const poll = setInterval(async () => {
+        try {
+            const s = await (await fetch('/api/system/update/status')).json();
+            logBox.innerHTML = s.logs.map(l => {
+                const c = (l.startsWith('✓') || l.startsWith('✅')) ? '#16a34a'
+                        : l.startsWith('✗') ? '#dc2626'
+                        : l.startsWith('⚠') ? '#d97706' : '#374151';
+                return `<div style="color:${c}">${l}</div>`;
+            }).join('');
+            logBox.scrollTop = logBox.scrollHeight;
+            if (s.done) {
+                clearInterval(poll);
+                if (s.success) {
+                    actionBtn.style.background = '#6366f1';
+                    actionBtn.textContent = '🔄 重启服务';
+                    actionBtn.disabled = false;
+                    actionBtn.onclick = restartServer;
+                } else {
+                    actionBtn.style.background = '#ef4444';
+                    actionBtn.textContent = '重试';
+                    actionBtn.disabled = false;
+                    actionBtn.onclick = startUpdate;
+                }
+            }
+        } catch (e) {}
+    }, 1500);
+}
+
+async function restartServer() {
+    const actionBtn = document.getElementById('upActionBtn');
+    const logBox = document.getElementById('upLogBox');
+    actionBtn.disabled = true;
+    actionBtn.textContent = '重启中...';
+    logBox.innerHTML += '<div style="color:#6366f1;margin-top:4px;">🔄 服务重启中，页面将自动刷新...</div>';
+    logBox.scrollTop = logBox.scrollHeight;
+    try { await fetch('/api/system/restart', { method: 'POST' }); } catch (e) {}
+    const t0 = Date.now();
+    const wait = setInterval(async () => {
+        try {
+            if ((await fetch('/api/system/version')).ok) {
+                clearInterval(wait);
+                location.reload();
+            }
+        } catch (e) {
+            if (Date.now() - t0 > 30000) {
+                clearInterval(wait);
+                showToast('重启超时，请手动刷新页面', 6000, 'error');
+            }
+        }
+    }, 1000);
+}
+
 // === 初始化 ===
 loadDashboard();
 loadRefreshTimestamp();
+initVersionBadge();
 
 // 页面加载时检查是否有正在进行的更新任务，有则自动接上进度显示
 (async function resumeRefreshIfRunning() {

@@ -11,13 +11,55 @@
     <!-- 导航栏 -->
     <nav class="navbar">
         <div class="container">
-            <h1>基金投资决策助手</h1>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <h1>基金投资决策助手</h1>
+                <button id="versionBadge" onclick="toggleUpdatePanel(event)"
+                  style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);
+                  color:white;padding:3px 10px;border-radius:20px;cursor:pointer;font-size:12px;
+                  display:inline-flex;align-items:center;gap:5px;transition:background 0.15s;white-space:nowrap;">
+                  <span id="vBadgeText">v1.1.1</span>
+                  <span id="vBadgeDot" style="font-size:8px;color:rgba(255,255,255,0.4);">●</span>
+                </button>
+            </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
                 <button class="refresh-btn" id="refreshBtn" onclick="refreshData()">更新净值</button>
                 <div id="refreshTimestamp" style="font-size:11px;color:rgba(255,255,255,0.65);white-space:nowrap;"></div>
             </div>
         </div>
     </nav>
+
+<!-- ── 版本更新面板 ───────────────────────────────────────────── -->
+<div id="updatePanel" style="display:none;position:fixed;top:70px;left:20px;width:300px;
+  background:#fff;border:1px solid #e2e8f0;border-radius:12px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.14);z-index:9500;padding:18px 20px;font-size:14px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+    <span style="font-weight:600;color:#1e293b;">当前版本</span>
+    <button id="upRefreshBtn" onclick="checkForUpdate()"
+      style="background:none;border:none;cursor:pointer;font-size:18px;color:#94a3b8;padding:2px 6px;line-height:1;" title="检查更新">↻</button>
+  </div>
+  <div style="text-align:center;padding:4px 0 16px;">
+    <div id="upCurrentVer" style="font-size:30px;font-weight:700;color:#1e293b;letter-spacing:-0.5px;">—</div>
+    <div id="upLatestRow" style="font-size:12px;color:#94a3b8;margin-top:5px;min-height:16px;"></div>
+  </div>
+  <div id="upNewBanner" style="display:none;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:10px 14px;margin-bottom:14px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span style="font-size:22px;">⬇</span>
+      <div>
+        <div style="font-weight:600;color:#9a3412;font-size:13px;">有新版本可用！</div>
+        <div id="upNewVer" style="font-size:12px;color:#c2410c;margin-top:2px;"></div>
+      </div>
+    </div>
+  </div>
+  <div id="upLatestNotice" style="display:none;text-align:center;color:#16a34a;font-size:13px;padding:4px 0 12px;">✓ 已是最新版本</div>
+  <div id="upLogBox" style="display:none;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:12px;font-family:monospace;max-height:130px;overflow-y:auto;line-height:1.7;"></div>
+  <button id="upActionBtn" onclick="startUpdate()"
+    style="display:none;width:100%;border:none;border-radius:8px;padding:10px;font-size:14px;font-weight:600;cursor:pointer;background:#22c55e;color:white;">⬇ 立即更新</button>
+  <div style="text-align:center;margin-top:12px;">
+    <a id="upChangelogLink" href="https://github.com/pakoo/sanhu/releases" target="_blank"
+      style="font-size:12px;color:#94a3b8;text-decoration:none;">查看更新日志 ↗</a>
+  </div>
+</div>
+<div id="upOverlay" onclick="closeUpdatePanel()" style="display:none;position:fixed;inset:0;z-index:9400;"></div>
 
     <!-- 底部状态栏（刷新进度） -->
     <div id="refreshStatusBar" style="display:none;position:fixed;bottom:0;left:0;right:0;height:44px;

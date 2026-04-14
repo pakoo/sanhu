@@ -782,3 +782,183 @@ def api_simulation_advance(sim_id: int):
         return {"status": "ok", "data": advance_forward_simulation(sim_id)}
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+
+
+# ── 系统更新 ───────────────────────────────────────────────────────────────────
+# 记录启动命令，重启时复用（python -m uvicorn app:app --host 0.0.0.0 ...）
+_RESTART_CMD = [sys.executable, "-m", "uvicorn"] + sys.argv[1:]
+
+_update_task: dict = {
+    "running": False, "done": False, "success": False,
+    "logs": [], "new_version": None,
+}
+
+
+def _semver_gt(a: str, b: str) -> bool:
+    """True 当且仅当 a 的语义版本号严格大于 b（如 v1.1.2 > v1.1.1）"""
+    import re
+    def parse(v: str):
+        m = re.match(r"v?(\d+)\.(\d+)\.(\d+)", v or "")
+        return tuple(int(x) for x in m.groups()) if m else (0, 0, 0)
+    return parse(a) > parse(b)
+
+
+def _fetch_version_info() -> dict:
+    """查 GitHub releases（优先）或 tags，返回 {latest, changelog_url}"""
+    import urllib.request as _req
+    import json as _json
+    hdrs = {
+        "Accept": "application/vnd.github.v3+json",
+        "User-Agent": "jijin-updater/1.0",
+    }
+    # 1. releases/latest
+    try:
+        req = _req.Request(
+            "https://api.github.com/repos/pakoo/sanhu/releases/latest", headers=hdrs
+        )
+        with _req.urlopen(req, timeout=8) as resp:
+            d = _json.loads(resp.read())
+        if d.get("tag_name"):
+            return {
+                "latest": d["tag_name"],
+                "changelog_url": d.get("html_url", "https://github.com/pakoo/sanhu/releases"),
+            }
+    except Exception:
+        pass
+    # 2. fallback: tags
+    req = _req.Request("https://api.github.com/repos/pakoo/sanhu/tags", headers=hdrs)
+    with _req.urlopen(req, timeout=8) as resp:
+        tags = _json.loads(resp.read())
+    if not tags:
+        return {}
+    return {"latest": tags[0]["name"], "changelog_url": "https://github.com/pakoo/sanhu/releases"}
+
+
+def _run_update_task(new_version: str) -> None:
+    global _update_task
+
+    def log(msg: str):
+        _update_task["logs"].append(msg)
+
+    try:
+        log("⬇ 拉取最新代码...")
+        r = subprocess.run(
+            ["git", "fetch", "origin"], capture_output=True, text=True, cwd=BASE_DIR
+        )
+        if r.returncode != 0:
+            log(f"✗ git fetch 失败：{r.stderr.strip()}")
+            return
+
+        # 检测 requirements.txt 是否有变更，决定是否跑 pip install
+        r_diff = subprocess.run(
+            ["git", "diff", "HEAD", "origin/main", "--", "requirements.txt"],
+            capture_output=True, text=True, cwd=BASE_DIR,
+        )
+        req_changed = bool(r_diff.stdout.strip())
+
+        r = subprocess.run(
+            ["git", "reset", "--hard", "origin/main"],
+            capture_output=True, text=True, cwd=BASE_DIR,
+        )
+        if r.returncode != 0:
+            log(f"✗ 代码同步失败：{r.stderr.strip()}")
+            return
+        log("✓ 代码同步完成")
+
+        if req_changed:
+            log("📦 检测到依赖变更，安装新依赖...")
+            req_file = os.path.join(BASE_DIR, "requirements.txt")
+            r = subprocess.run(
+                [sys.executable, "-m", "pip", "install", "-r", req_file, "-q"],
+                capture_output=True, text=True,
+            )
+            log("✓ 依赖安装完成" if r.returncode == 0 else "⚠ pip 安装有警告（可能不影响运行）")
+        else:
+            log("✓ 依赖无变更，跳过安装")
+
+        log(f"✅ 已更新至 {new_version}，点击「重启服务」生效")
+        _update_task["success"] = True
+        _update_task["new_version"] = new_version
+    except Exception as e:
+        log(f"✗ 更新失败：{e}")
+        _update_task["success"] = False
+    finally:
+        _update_task["running"] = False
+        _update_task["done"] = True
+
+
+@app.get("/api/system/version")
+def api_system_version():
+    r = subprocess.run(
+        ["git", "describe", "--tags", "--abbrev=0"],
+        capture_output=True, text=True, cwd=BASE_DIR,
+    )
+    return {
+        "version": app.version,
+        "git_tag": r.stdout.strip() if r.returncode == 0 else None,
+        "changelog_url": "https://github.com/pakoo/sanhu/releases",
+    }
+
+
+@app.get("/api/system/check-update")
+def api_check_update():
+    try:
+        info = _fetch_version_info()
+        if not info:
+            return {"has_update": False, "current": f"v{app.version}"}
+        latest = info["latest"]
+        current = f"v{app.version}"
+        return {
+            "has_update": _semver_gt(latest, current),
+            "current": current,
+            "latest": latest,
+            "changelog_url": info.get("changelog_url", "https://github.com/pakoo/sanhu/releases"),
+        }
+    except Exception as e:
+        return {"has_update": False, "current": f"v{app.version}", "error": str(e)}
+
+
+@app.post("/api/system/update")
+def api_system_update(background_tasks: BackgroundTasks):
+    global _update_task
+    if _update_task["running"]:
+        return {"error": "更新任务已在运行"}
+    try:
+        info = _fetch_version_info()
+        new_version = info.get("latest", "latest")
+    except Exception:
+        new_version = "latest"
+    _update_task = {
+        "running": True, "done": False, "success": False,
+        "logs": [], "new_version": new_version,
+    }
+    background_tasks.add_task(_run_update_task, new_version)
+    return {"ok": True}
+
+
+@app.get("/api/system/update/status")
+def api_update_status():
+    return _update_task
+
+
+@app.post("/api/system/restart")
+def api_system_restart(background_tasks: BackgroundTasks):
+    import time as _t
+
+    def _do_restart():
+        _t.sleep(0.4)  # 等 HTTP 响应先发出
+        cmd_str = " ".join(shlex.quote(c) for c in _RESTART_CMD)
+        # 延迟 2s 启动新进程，确保旧进程完全退出并释放端口
+        subprocess.Popen(
+            f"sleep 2 && {cmd_str}",
+            shell=True,
+            start_new_session=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            cwd=BASE_DIR,
+        )
+        _t.sleep(0.2)
+        os._exit(0)  # 立即退出当前进程
+
+    background_tasks.add_task(_do_restart)
+    return {"ok": True}
