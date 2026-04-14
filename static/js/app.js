@@ -136,41 +136,23 @@ function _renderRefreshTimestamp(isoStr) {
     el.innerHTML = `<span style="color:${dotColor}">●</span> ${timeStr} 已更新`;
 }
 
-async function loadRefreshTimestamp() {
-    try {
-        const s = await API.getRefreshStatus();
-        _renderRefreshTimestamp(s.last_refresh_at);
-    } catch (e) {}
-}
-
-async function refreshData() {
-    const btn = document.getElementById('refreshBtn');
-    const bar  = document.getElementById('refreshStatusBar');
-    const rsbBar    = document.getElementById('rsbBar');
-    const rsbLabel  = document.getElementById('rsbLabel');
-    const rsbCount  = document.getElementById('rsbCount');
-    const rsbChips  = document.getElementById('rsbChips');
+// 启动底部状态栏轮询（供首次点击和页面刷新后恢复共用）
+function _startRefreshPoll() {
+    const btn      = document.getElementById('refreshBtn');
+    const bar      = document.getElementById('refreshStatusBar');
+    const rsbBar   = document.getElementById('rsbBar');
+    const rsbLabel = document.getElementById('rsbLabel');
+    const rsbCount = document.getElementById('rsbCount');
+    const rsbChips = document.getElementById('rsbChips');
 
     btn.disabled = true;
     btn.textContent = '更新中…';
-
-    // 显示底部状态栏
     rsbLabel.textContent = '更新净值中';
     rsbLabel.style.color = '#374151';
     rsbCount.textContent = '';
     rsbBar.style.width = '0%';
     rsbChips.innerHTML = '';
     bar.style.display = 'flex';
-
-    try {
-        await API.refreshData();
-    } catch (e) {
-        bar.style.display = 'none';
-        showToast('更新失败：' + e.message, 4000, 'error');
-        btn.disabled = false;
-        btn.textContent = '更新净值';
-        return;
-    }
 
     const poll = setInterval(async () => {
         let s;
@@ -191,7 +173,6 @@ async function refreshData() {
         if (!s.running) {
             clearInterval(poll);
             rsbBar.style.width = '100%';
-
             const hasErr = s.errors && s.errors.length > 0;
             if (hasErr) {
                 rsbLabel.textContent = `⚠ ${s.errors.length} 只更新失败`;
@@ -202,7 +183,6 @@ async function refreshData() {
                 setTimeout(() => { bar.style.display = 'none'; }, 4000);
             }
             rsbCount.textContent = '';
-
             _renderRefreshTimestamp(s.last_refresh_at);
             btn.disabled = false;
             btn.textContent = '更新净值';
@@ -211,6 +191,23 @@ async function refreshData() {
             await loadDashboard();
         }
     }, 1500);
+}
+
+async function loadRefreshTimestamp() {
+    try {
+        const s = await API.getRefreshStatus();
+        _renderRefreshTimestamp(s.last_refresh_at);
+    } catch (e) {}
+}
+
+async function refreshData() {
+    try {
+        await API.refreshData();
+    } catch (e) {
+        showToast('更新失败：' + e.message, 4000, 'error');
+        return;
+    }
+    _startRefreshPoll();
 }
 
 // === Tab 1: 总览 ===
@@ -1395,3 +1392,11 @@ async function submitTransaction() {
 // === 初始化 ===
 loadDashboard();
 loadRefreshTimestamp();
+
+// 页面加载时检查是否有正在进行的更新任务，有则自动接上进度显示
+(async function resumeRefreshIfRunning() {
+    try {
+        const s = await API.getRefreshStatus();
+        if (s.running) _startRefreshPoll();
+    } catch (e) {}
+})();
