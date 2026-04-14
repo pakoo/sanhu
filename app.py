@@ -128,7 +128,7 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 
-app = FastAPI(title="基金投资决策助手", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="基金投资决策助手", version="1.1.1", lifespan=lifespan)
 
 # 静态文件
 app.mount("/static", StaticFiles(directory="static"), name="static")
