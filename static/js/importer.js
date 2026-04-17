@@ -1,16 +1,133 @@
-// === 截图导入模块 ===
+// === 截图导入 / 手动更新持仓模块 ===
 
 let _importRows = [];
 let _importType = 'holdings';
 let _importFile = null;
+let _manualRows = [];   // 手动输入暂存
+
+// ── Tab 切换 ───────────────────────────────────────────────────
+function switchImportTab(tab) {
+    const isManual = tab === 'manual';
+    document.getElementById('importPanelManual').style.display     = isManual ? 'block' : 'none';
+    document.getElementById('importPanelScreenshot').style.display = isManual ? 'none'  : 'block';
+    const on  = 'color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;';
+    const off = 'color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;';
+    document.getElementById('importTabManual').style.cssText     = `flex:1;padding:10px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;${isManual ? on : off}`;
+    document.getElementById('importTabScreenshot').style.cssText = `flex:1;padding:10px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;${isManual ? off : on}`;
+}
+
+// ── 手动输入逻辑 ───────────────────────────────────────────────
+function _renderManualStage() {
+    const wrap = document.getElementById('manualStageWrap');
+    if (_manualRows.length === 0) {
+        wrap.style.display = 'none';
+        document.getElementById('manualReplaceWarning').style.display = 'none';
+        document.getElementById('manualCommitBtn').disabled = true;
+        return;
+    }
+    wrap.style.display = 'block';
+    document.getElementById('manualReplaceWarning').style.display = 'block';
+    updateManualCommitBtn();
+    document.getElementById('manualStageBody').innerHTML = _manualRows.map((r, i) => `
+        <tr>
+            <td style="padding:6px 10px;">${r.code}</td>
+            <td style="padding:6px 10px;color:var(--text-secondary);font-size:12px;">${r.name || '–'}</td>
+            <td style="padding:6px 10px;text-align:right;">¥${r.current_value.toFixed(2)}</td>
+            <td style="padding:6px 10px;text-align:right;">${r.profit != null ? (r.profit >= 0 ? '+' : '') + r.profit.toFixed(2) : '–'}</td>
+            <td style="padding:6px 10px;text-align:center;">
+                <button onclick="_manualRemoveRow(${i})" style="background:none;border:none;cursor:pointer;color:#ef4444;">✕</button>
+            </td>
+        </tr>`).join('');
+}
+
+function _manualRemoveRow(i) {
+    _manualRows.splice(i, 1);
+    _renderManualStage();
+}
+
+async function manualAddRow() {
+    const codeEl   = document.getElementById('manualCode');
+    const amtEl    = document.getElementById('manualAmount');
+    const profitEl = document.getElementById('manualProfit');
+    const errEl    = document.getElementById('manualAddError');
+    errEl.style.display = 'none';
+
+    const code   = codeEl.value.trim();
+    const amount = parseFloat(amtEl.value);
+
+    if (!/^\d{6}$/.test(code)) {
+        errEl.textContent = '请输入6位基金代码'; errEl.style.display = 'block'; return;
+    }
+    if (isNaN(amount) || amount <= 0) {
+        errEl.textContent = '请输入有效的持有金额'; errEl.style.display = 'block'; return;
+    }
+    if (_manualRows.some(r => r.code === code)) {
+        errEl.textContent = `${code} 已在列表中`; errEl.style.display = 'block'; return;
+    }
+
+    // 尝试查名称（失败不影响添加）
+    let name = '';
+    try {
+        const res = await API.searchFund(code);
+        const match = Array.isArray(res) ? res.find(f => f.code === code) : null;
+        if (match) name = match.name || '';
+    } catch (e) {}
+
+    const profitStr = profitEl.value.trim();
+    const profit = profitStr !== '' ? parseFloat(profitStr) : null;
+    _manualRows.push({
+        code, name,
+        current_value: amount,
+        profit,
+        cost_amount: amount - (profit || 0),
+        shares: 0,
+    });
+    codeEl.value = ''; amtEl.value = ''; profitEl.value = '';
+    codeEl.focus();
+    _renderManualStage();
+}
+
+function updateManualCommitBtn() {
+    const ok = document.getElementById('manualReplaceConfirm').checked && _manualRows.length > 0;
+    document.getElementById('manualCommitBtn').disabled = !ok;
+}
+
+async function commitManualImport() {
+    const btn = document.getElementById('manualCommitBtn');
+    btn.disabled = true;
+    btn.textContent = '提交中…';
+    try {
+        await API.commitImport({ import_type: 'holdings', rows: _manualRows });
+        document.getElementById('importModal').style.display = 'none';
+        _manualRows = [];
+        portfolioData = null;
+        await loadDashboard();
+    } catch (e) {
+        btn.disabled = false;
+        btn.textContent = '确认更新';
+        alert('提交失败，请重试');
+    }
+}
 
 // ── 开启弹窗 ───────────────────────────────────────────────────
 function openImportModal() {
     _importRows = [];
     _importFile = null;
     _importType = 'holdings';
+    _manualRows = [];
 
-    // 重置 Step 1
+    // 重置手动输入区
+    ['manualCode', 'manualAmount', 'manualProfit'].forEach(id => {
+        document.getElementById(id).value = '';
+    });
+    document.getElementById('manualAddError').style.display = 'none';
+    document.getElementById('manualStageWrap').style.display = 'none';
+    document.getElementById('manualReplaceWarning').style.display = 'none';
+    document.getElementById('manualReplaceConfirm').checked = false;
+    document.getElementById('manualCommitBtn').disabled = true;
+    document.getElementById('manualStageBody').innerHTML = '';
+
+    // 重置截图 Step 1
     document.getElementById('importStep1').style.display = 'block';
     document.getElementById('importStep2').style.display = 'none';
     document.getElementById('importPreview').style.display = 'none';
@@ -22,6 +139,7 @@ function openImportModal() {
         r.checked = r.value === 'holdings';
     });
 
+    switchImportTab('manual');
     document.getElementById('importModal').style.display = 'flex';
 }
 
@@ -229,7 +347,9 @@ async function commitImport() {
 
         // 成功
         closeImportModal(null);
-        alert(`导入成功：${result.imported} 条${result.skipped > 0 ? `，跳过 ${result.skipped} 条（基金未在系统中）` : ''}`);
+        const updated = result.updated ?? 0;
+        const inserted = result.inserted ?? result.imported ?? 0;
+        alert(`更新成功：更新 ${updated} 条，新增 ${inserted} 条`);
 
         // 刷新持仓数据
         if (typeof loadDashboard === 'function') {

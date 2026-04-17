@@ -18,7 +18,7 @@
                   style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.25);
                   color:white;padding:3px 10px;border-radius:20px;cursor:pointer;font-size:12px;
                   display:inline-flex;align-items:center;gap:5px;transition:background 0.15s;white-space:nowrap;">
-                  <span id="vBadgeText">v1.1.1</span>
+                  <span id="vBadgeText">v1.1.2</span>
                   <span id="vBadgeDot" style="font-size:8px;color:rgba(255,255,255,0.4);">●</span>
                 </button>
             </div>
@@ -130,7 +130,7 @@
                     </div>
                     <!-- 持仓明细操作按钮 -->
                     <div id="holdings-actions">
-                        <button class="btn" onclick="openImportModal()" style="font-size:13px;padding:4px 12px;margin-right:6px;">从截图导入</button>
+                        <button class="btn" onclick="openImportModal()" style="font-size:13px;padding:4px 12px;margin-right:6px;">更新持仓</button>
                         <button class="btn" onclick="openTxModal()" style="font-size:13px;padding:4px 12px;">记录交易</button>
                     </div>
                     <!-- 关注列表操作按钮 -->
@@ -162,6 +162,7 @@
                                 <th>近3月</th>
                                 <th style="min-width:100px;">近1月走势</th>
                                 <th>综合评分</th>
+                                <th>操作</th>
                             </tr>
                         </thead>
                         <tbody id="holdingsBody"></tbody>
@@ -840,78 +841,156 @@
         </div>
     </div>
 
-    <!-- 截图导入模态框 -->
+    <!-- 更新持仓模态框 -->
     <div class="modal-overlay" id="importModal" style="display:none;align-items:center;justify-content:center;" onclick="closeImportModal(event)">
         <div class="modal" onclick="event.stopPropagation()" style="max-width:700px;width:95%;max-height:90vh;overflow-y:auto;">
 
-            <!-- Step 1：上传 -->
-            <div id="importStep1">
-                <div class="modal-title">从支付宝截图导入</div>
-                <div style="display:flex;gap:16px;margin-bottom:16px;">
-                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;">
-                        <input type="radio" name="importType" value="holdings" checked> 持仓截图
-                    </label>
-                    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;">
-                        <input type="radio" name="importType" value="transactions"> 交易记录截图
-                    </label>
-                </div>
-                <div id="importDropZone" style="border:2px dashed var(--border);border-radius:12px;padding:36px;text-align:center;cursor:pointer;transition:border-color 0.2s;">
-                    <div style="font-size:36px;margin-bottom:8px;">📷</div>
-                    <div style="font-weight:500;">点击或拖拽图片到此处</div>
-                    <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">支持 JPG、PNG，最大 10MB</div>
-                    <input type="file" id="importFileInput" accept="image/jpeg,image/png" style="display:none;">
-                </div>
-                <div id="importPreview" style="display:none;margin-top:12px;text-align:center;">
-                    <img id="importPreviewImg" style="max-height:180px;border-radius:8px;border:1px solid var(--border);object-fit:contain;">
-                </div>
-                <!-- 解析中 loading -->
-                <div id="importParseLoading" style="display:none;align-items:center;gap:10px;margin-top:12px;color:var(--text-secondary);font-size:13px;">
-                    <div style="width:18px;height:18px;border:2px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
-                    正在识别截图（通过 OCR.space 云端识别）...
-                </div>
-                <div id="importParseError" style="color:#ef4444;font-size:13px;margin-top:8px;display:none;"></div>
-                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
-                    <button class="btn" onclick="closeImportModal(null)" style="background:#f1f5f9;color:var(--text);">取消</button>
-                    <button class="btn btn-primary" id="importParseBtn" onclick="parseImport()" disabled>解析截图</button>
-                </div>
+            <!-- Tab 切换 -->
+            <div id="importTabBar" style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border);">
+                <button id="importTabManual" onclick="switchImportTab('manual')"
+                    style="flex:1;padding:10px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;">
+                    ✏️ 手动输入
+                </button>
+                <button id="importTabScreenshot" onclick="switchImportTab('screenshot')"
+                    style="flex:1;padding:10px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;">
+                    📷 支付宝截图
+                </button>
             </div>
 
-            <!-- Step 2：核对 -->
-            <div id="importStep2" style="display:none;">
-                <div class="modal-title" id="importStep2Title">校验解析结果</div>
-
-                <!-- 持仓覆盖警告 -->
-                <div id="importReplaceWarning" style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:none;">
+            <!-- ── 手动输入面板 ── -->
+            <div id="importPanelManual">
+                <div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">
+                    逐条填写后加入列表，全部填完后点「确认更新」，将<strong>更新列表中的持仓</strong>，列表外的持仓不受影响。
+                </div>
+                <!-- 单行表单 -->
+                <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                    <input id="manualCode" type="text" placeholder="基金代码（如 510300）" maxlength="6"
+                        style="flex:2;min-width:100px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
+                    <input id="manualAmount" type="number" placeholder="持有金额（元）" min="0"
+                        style="flex:2;min-width:100px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
+                    <input id="manualProfit" type="number" placeholder="持有收益（元，可选）"
+                        style="flex:2;min-width:100px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
+                    <button class="btn btn-primary" onclick="manualAddRow()" style="padding:7px 16px;font-size:13px;white-space:nowrap;">＋ 添加</button>
+                </div>
+                <div id="manualAddError" style="color:#ef4444;font-size:12px;margin-bottom:8px;display:none;"></div>
+                <!-- 暂存列表 -->
+                <div id="manualStageWrap" style="display:none;">
+                    <table id="manualStageTable" style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px;">
+                        <thead>
+                            <tr style="background:var(--bg-secondary);">
+                                <th style="padding:7px 10px;text-align:left;">代码</th>
+                                <th style="padding:7px 10px;text-align:left;">名称</th>
+                                <th style="padding:7px 10px;text-align:right;">持有金额</th>
+                                <th style="padding:7px 10px;text-align:right;">持有收益</th>
+                                <th style="padding:7px 10px;"></th>
+                            </tr>
+                        </thead>
+                        <tbody id="manualStageBody"></tbody>
+                    </table>
+                </div>
+                <div id="manualReplaceWarning" style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:none;">
                     <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
-                        <input type="checkbox" id="importReplaceConfirm" onchange="updateCommitBtn()" style="margin-top:2px;">
-                        <span style="font-size:13px;">此操作将<strong>替换全部现有持仓</strong>（原交易记录保留），请勾选确认后继续</span>
+                        <input type="checkbox" id="manualReplaceConfirm" onchange="updateManualCommitBtn()" style="margin-top:2px;">
+                        <span style="font-size:13px;">将更新列表中基金的持仓数据，列表外的持仓不受影响，请勾选确认后继续</span>
                     </label>
                 </div>
-
-                <div style="overflow-x:auto;">
-                    <table id="importReviewTable" style="width:100%;border-collapse:collapse;font-size:13px;"></table>
-                </div>
-
-                <div id="importCommitError" style="color:#ef4444;font-size:13px;margin-top:8px;display:none;"></div>
-                <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
-                    <button class="btn" onclick="goBackToImportStep1()" style="background:#f1f5f9;color:var(--text);">返回</button>
-                    <button class="btn btn-primary" id="importCommitBtn" onclick="commitImport()">确认导入</button>
+                <div style="display:flex;justify-content:flex-end;gap:10px;">
+                    <button class="btn" onclick="closeImportModal(null)" style="background:#f1f5f9;color:var(--text);">取消</button>
+                    <button class="btn btn-primary" id="manualCommitBtn" onclick="commitManualImport()" disabled>确认更新</button>
                 </div>
             </div>
 
+            <!-- ── 截图导入面板 ── -->
+            <div id="importPanelScreenshot" style="display:none;">
+
+                <!-- Step 1：上传 -->
+                <div id="importStep1">
+                    <div style="display:flex;gap:16px;margin-bottom:16px;">
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;">
+                            <input type="radio" name="importType" value="holdings" checked> 持仓截图
+                        </label>
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:14px;">
+                            <input type="radio" name="importType" value="transactions"> 交易记录截图
+                        </label>
+                    </div>
+                    <div id="importDropZone" style="border:2px dashed var(--border);border-radius:12px;padding:36px;text-align:center;cursor:pointer;transition:border-color 0.2s;">
+                        <div style="font-size:36px;margin-bottom:8px;">📷</div>
+                        <div style="font-weight:500;">点击或拖拽图片到此处</div>
+                        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">支持 JPG、PNG，最大 10MB</div>
+                        <input type="file" id="importFileInput" accept="image/jpeg,image/png" style="display:none;">
+                    </div>
+                    <div id="importPreview" style="display:none;margin-top:12px;text-align:center;">
+                        <img id="importPreviewImg" style="max-height:180px;border-radius:8px;border:1px solid var(--border);object-fit:contain;">
+                    </div>
+                    <div id="importParseLoading" style="display:none;align-items:center;gap:10px;margin-top:12px;color:var(--text-secondary);font-size:13px;">
+                        <div style="width:18px;height:18px;border:2px solid var(--primary);border-top-color:transparent;border-radius:50%;animation:spin 0.8s linear infinite;"></div>
+                        正在识别截图...
+                    </div>
+                    <div id="importParseError" style="color:#ef4444;font-size:13px;margin-top:8px;display:none;"></div>
+                    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+                        <button class="btn" onclick="closeImportModal(null)" style="background:#f1f5f9;color:var(--text);">取消</button>
+                        <button class="btn btn-primary" id="importParseBtn" onclick="parseImport()" disabled>解析截图</button>
+                    </div>
+                </div>
+
+                <!-- Step 2：核对 -->
+                <div id="importStep2" style="display:none;">
+                    <div class="modal-title" id="importStep2Title">校验解析结果</div>
+                    <div id="importReplaceWarning" style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;margin-bottom:12px;display:none;">
+                        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;">
+                            <input type="checkbox" id="importReplaceConfirm" onchange="updateCommitBtn()" style="margin-top:2px;">
+                            <span style="font-size:13px;">将更新截图中识别到的持仓数据，截图外的持仓不受影响，请勾选确认后继续</span>
+                        </label>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table id="importReviewTable" style="width:100%;border-collapse:collapse;font-size:13px;"></table>
+                    </div>
+                    <div id="importCommitError" style="color:#ef4444;font-size:13px;margin-top:8px;display:none;"></div>
+                    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px;">
+                        <button class="btn" onclick="goBackToImportStep1()" style="background:#f1f5f9;color:var(--text);">返回</button>
+                        <button class="btn btn-primary" id="importCommitBtn" onclick="commitImport()">确认导入</button>
+                    </div>
+                </div>
+
+            </div>
         </div>
     </div>
 
-    <script src="/static/js/terms.js?v=20260413"></script>
-    <script src="/static/js/tooltip.js?v=20260413"></script>
-    <script src="/static/js/guide.js?v=20260413"></script>
-    <script src="/static/js/api.js?v=20260413"></script>
-    <script src="/static/js/app.js?v=20260413"></script>
-    <script src="/static/js/watchlist.js?v=20260413"></script>
-    <script src="/static/js/importer.js?v=20260413"></script>
-    <script src="/static/js/selector.js?v=20260413"></script>
-    <script src="/static/js/decisions.js?v=20260413"></script>
-    <script src="/static/js/simulations.js?v=20260413"></script>
+    <!-- 单条持仓编辑模态框 -->
+    <div class="modal-overlay" id="editHoldingModal" style="display:none;align-items:center;justify-content:center;" onclick="closeEditHoldingModal(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width:420px;width:95%;">
+            <div class="modal-title">编辑持仓</div>
+            <div style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;" id="editHoldingName"></div>
+            <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:16px;">
+                <div>
+                    <label style="font-size:13px;font-weight:500;display:block;margin-bottom:4px;">当前持有金额（元）</label>
+                    <input id="editHoldingAmount" type="number" min="0" step="0.01"
+                        style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
+                </div>
+                <div>
+                    <label style="font-size:13px;font-weight:500;display:block;margin-bottom:4px;">持有收益（元，可选）</label>
+                    <input id="editHoldingProfit" type="number" step="0.01" placeholder="留空则不更新"
+                        style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:14px;box-sizing:border-box;">
+                </div>
+            </div>
+            <div id="editHoldingError" style="color:#ef4444;font-size:13px;margin-bottom:10px;display:none;"></div>
+            <div style="display:flex;justify-content:flex-end;gap:10px;">
+                <button class="btn" onclick="closeEditHoldingModal(null)" style="background:#f1f5f9;color:var(--text);">取消</button>
+                <button class="btn btn-primary" onclick="submitEditHolding()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/terms.js?v=20260417"></script>
+    <script src="/static/js/tooltip.js?v=20260417"></script>
+    <script src="/static/js/guide.js?v=20260417"></script>
+    <script src="/static/js/api.js?v=20260417"></script>
+    <script src="/static/js/app.js?v=20260417"></script>
+    <script src="/static/js/watchlist.js?v=20260417"></script>
+    <script src="/static/js/importer.js?v=20260417"></script>
+    <script src="/static/js/selector.js?v=20260417"></script>
+    <script src="/static/js/decisions.js?v=20260417"></script>
+    <script src="/static/js/simulations.js?v=20260417"></script>
 
 <!-- ── 微信浮动入口 ───────────────────────────────────────────── -->
 <div id="wxWidget">

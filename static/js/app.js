@@ -378,6 +378,12 @@ function renderHoldingsTable(data) {
             <td>${fmtPct(h.ret_3m)}</td>
             <td>${renderSparkline(h.nav_curve)}</td>
             <td style="text-align:center;">${scoreCell}</td>
+            <td style="white-space:nowrap;text-align:center;">
+                <button onclick="openEditHolding('${h.code}','${h.name.replace(/'/g,"\\'")}',${h.current_value},${h.profit})"
+                    style="background:none;border:none;cursor:pointer;color:var(--primary);font-size:13px;padding:2px 6px;" title="编辑">✏️</button>
+                <button onclick="confirmDeleteHolding('${h.code}','${h.name.replace(/'/g,"\\'")}' )"
+                    style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px;padding:2px 6px;" title="删除">🗑</button>
+            </td>
         </tr>`;
     }).join('');
 }
@@ -1535,3 +1541,55 @@ initVersionBadge();
         if (s.running) _startRefreshPoll();
     } catch (e) {}
 })();
+
+// ── 单条持仓：编辑 ──────────────────────────────────────────
+let _editingCode = null;
+
+function openEditHolding(code, name, currentValue, profit) {
+    _editingCode = code;
+    document.getElementById('editHoldingName').textContent = `${name}（${code}）`;
+    document.getElementById('editHoldingAmount').value = currentValue || '';
+    document.getElementById('editHoldingProfit').value = profit != null ? profit : '';
+    document.getElementById('editHoldingError').style.display = 'none';
+    document.getElementById('editHoldingModal').style.display = 'flex';
+}
+
+function closeEditHoldingModal(e) {
+    if (e && e.target !== document.getElementById('editHoldingModal')) return;
+    document.getElementById('editHoldingModal').style.display = 'none';
+    _editingCode = null;
+}
+
+async function submitEditHolding() {
+    const amount = parseFloat(document.getElementById('editHoldingAmount').value);
+    const profitVal = document.getElementById('editHoldingProfit').value;
+    const errEl = document.getElementById('editHoldingError');
+
+    if (isNaN(amount) || amount <= 0) {
+        errEl.textContent = '请输入有效的持有金额';
+        errEl.style.display = 'block';
+        return;
+    }
+    const data = { current_value: amount };
+    if (profitVal !== '') data.profit = parseFloat(profitVal) || 0;
+
+    try {
+        await API.updateHolding(_editingCode, data);
+        document.getElementById('editHoldingModal').style.display = 'none';
+        _editingCode = null;
+        await loadDashboard();
+    } catch (e) {
+        errEl.textContent = '保存失败，请重试';
+        errEl.style.display = 'block';
+    }
+}
+
+// ── 单条持仓：删除 ──────────────────────────────────────────
+function confirmDeleteHolding(code, name) {
+    if (!confirm(`确认删除「${name}」的持仓？\n（关注列表和交易记录不受影响）`)) return;
+    API.deleteHolding(code).then(() => {
+        loadDashboard();
+    }).catch(() => {
+        alert('删除失败，请重试');
+    });
+}

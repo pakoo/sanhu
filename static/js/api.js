@@ -76,10 +76,21 @@ const API = {
         }).then(r => r.json());
     },
 
-    // 截图导入
+    // 截图导入 / 手动更新持仓
     parseImport(formData) {
-        // 不设 Content-Type，让浏览器自动处理 multipart boundary
         return fetch('/api/import/parse', { method: 'POST', body: formData }).then(r => r.json());
     },
     commitImport(data) { return this.post('/api/import/commit', data); },
+
+    // 单条持仓操作
+    updateHolding(code, data) {
+        return fetch(`/api/holdings/${code}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        }).then(r => r.json());
+    },
+    deleteHolding(code) {
+        return fetch(`/api/holdings/${code}`, { method: 'DELETE' }).then(r => r.json());
+    },
 };

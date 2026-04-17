@@ -6,7 +6,7 @@ import subprocess
 import sys
 from typing import Optional
 
-from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, Form, BackgroundTasks, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, Response
 from contextlib import asynccontextmanager
@@ -18,6 +18,7 @@ from backend.risk import risk_analysis, correlation_matrix
 from backend.rebalance import get_rebalance_suggestions, set_target_allocation, get_target_allocation, gradual_transition_plan
 from backend.watchlist import get_watchlist, add_to_watchlist, remove_from_watchlist
 from backend.backtest import dca_backtest, take_profit_backtest, portfolio_backtest
+from pydantic import BaseModel
 from backend.models import (
     TransactionRequest, TargetAllocationRequest,
     DCABacktestRequest, TakeProfitBacktestRequest, PortfolioBacktestRequest,
@@ -128,7 +129,7 @@ async def lifespan(app: FastAPI):
     scheduler.shutdown()
 
 
-app = FastAPI(title="基金投资决策助手", version="1.1.1", lifespan=lifespan)
+app = FastAPI(title="基金投资决策助手", version="1.1.2", lifespan=lifespan)
 
 # 静态文件
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -497,6 +498,50 @@ async def api_import_commit(req: ImportCommitRequest):
     else:
         result = bulk_import_transactions(req.rows)
     return result
+
+
+class HoldingUpdateRequest(BaseModel):
+    current_value: float          # 当前持有金额
+    profit: Optional[float] = None  # 持有收益（可选）
+
+
+@app.put("/api/holdings/{code}")
+async def api_update_holding(code: str, req: HoldingUpdateRequest):
+    """更新单条持仓的金额和收益"""
+    conn = get_connection()
+    holding = conn.execute("SELECT * FROM holdings WHERE code=?", (code,)).fetchone()
+    if not holding:
+        conn.close()
+        raise HTTPException(status_code=404, detail="持仓不存在")
+
+    profit = req.profit if req.profit is not None else 0.0
+    # 反推份额：用当前净值换算，保证 portfolio 计算正确
+    nav_row = conn.execute(
+        "SELECT nav FROM nav_history WHERE code=? ORDER BY date DESC LIMIT 1", (code,)
+    ).fetchone()
+    nav = nav_row["nav"] if nav_row and nav_row["nav"] else 1.0
+    shares = round(req.current_value / nav, 4) if nav > 0 else req.current_value
+    cost_amount = round(shares * nav - profit, 4)
+
+    conn.execute(
+        "UPDATE holdings SET shares=?, cost_amount=? WHERE code=?",
+        (shares, cost_amount, code)
+    )
+    conn.commit()
+    conn.close()
+    return {"ok": True, "code": code}
+
+
+@app.delete("/api/holdings/{code}")
+async def api_delete_holding(code: str):
+    """删除单条持仓（不影响关注列表和交易记录）"""
+    conn = get_connection()
+    result = conn.execute("DELETE FROM holdings WHERE code=?", (code,))
+    conn.commit()
+    conn.close()
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="持仓不存在")
+    return {"ok": True, "code": code}
 
 
 @app.get("/api/watchlist")
