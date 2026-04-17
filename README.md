@@ -1,4 +1,11 @@
-# 散户 sanhu
+# 散户 sanhu（Python 归档版）
+
+> ⚠️ **本仓库已归档（Python 版 final-python tag）**
+>
+> 正在用 Go 重写的新版本：**[sanhu-go](https://github.com/pakoo/sanhu-go)**
+> —— 原生 Windows/macOS exe，双击即用，支持自动更新。
+
+---
 
 > 普通人买基金的决策助手。帮你看懂、帮你比较、帮你模拟 —— 最终由你决定。
 
