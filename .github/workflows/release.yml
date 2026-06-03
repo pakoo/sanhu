@@ -70,7 +70,8 @@ jobs:
         if: matrix.goos == 'windows'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset_name }}
+          # 用不含 .exe 的固定名，与 release files 路径 artifacts/sanhu-windows-amd64/ 对齐
+          name: sanhu-windows-amd64
           path: sanhu-windows-amd64.zip
 
       - name: Upload artifact (Unix)
