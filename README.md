@@ -1,13 +1,8 @@
-# 散户 sanhu（Python 归档版）
-
-> ⚠️ **本仓库已归档（Python 版 final-python tag）**
->
-> 正在用 Go 重写的新版本：**[sanhu-go](https://github.com/pakoo/sanhu-go)**
-> —— 原生 Windows/macOS exe，双击即用，支持自动更新。
-
----
+# 散户 sanhu
 
 > 普通人买基金的决策助手。帮你看懂、帮你比较、帮你模拟 —— 最终由你决定。
+>
+> **单文件程序，双击即用** —— 原生 Windows / macOS / Linux 可执行文件，无需安装 Python 或任何依赖，首次启动自动下载初始数据。Python 旧版见 `final-python` tag。
 
 ---
 
@@ -25,65 +20,38 @@ sanhu 是一个**本地运行的基金投资辅助工具**，连接公开数据�
 
 ---
 
-## 推荐安装方法：用 AI Agent 安装
-
-> 如果你有使用 [Claude Code](https://claude.ai/code)、[Codex](https://openai.com/codex) 或其他 AI Agent 的习惯，推荐用这个方式安装。
->
-> 还没有 Claude / ChatGPT 订阅？可以先到 **[ai.unaive.com](https://ai.unaive.com/)** 自查常见订阅问题，也提供国内可用的订阅方案。
-
-**为什么推荐 AI Agent 安装？**
-
-- 安装报错时 Agent 可以自动诊断并修复（如 Python 版本不对、依赖冲突、权限问题）
-- 不需要自己判断错误原因，Agent 会读取日志并给出解决方案
-- 适合不熟悉命令行的用户
-
-**安装启动 Prompt（复制后发给 Agent）：**
-
-```
-帮我在本机安装并启动这个项目：https://github.com/pakoo/sanhu
-
-步骤：
-1. 确认 Python 3.9+ 已安装，如果没有请提示我安装
-2. git clone https://github.com/pakoo/sanhu.git 并 cd 进入目录
-3. 执行 pip install -r requirements.txt
-4. 执行 python scripts/init_db.py
-5. 执行 python app.py 启动服务
-6. 确认 http://localhost:8000 可以正常访问
-
-如果任何步骤报错，请直接诊断并修复，不要只是告诉我错误信息。
-```
-
----
-
 ## 快速开始
 
-### Mac
+sanhu 是一个**单文件程序**：下载对应平台的可执行文件，双击运行即可——无需安装 Python、Node 或数据库。
 
-1. 下载或 clone 本仓库
-2. 双击 **`install.command`** — 自动安装依赖、初始化数据库、启动服务、打开浏览器
-3. 以后每次启动：双击 **`start.command`**
+### 下载
 
-> 首次运行 macOS 可能提示"无法验证开发者"，右键 → 打开 → 确认即可
+前往 **[Releases](https://github.com/pakoo/sanhu/releases/latest)** 下载你的平台对应文件：
 
-### Windows
+| 平台 | 文件 |
+|---|---|
+| Windows | `sanhu-windows-amd64.zip`（解压后双击 `sanhu.exe`） |
+| macOS (Apple 芯片) | `sanhu-darwin-arm64.tar.gz` |
+| macOS (Intel) | `sanhu-darwin-amd64.tar.gz` |
+| Linux | `sanhu-linux-amd64.tar.gz` |
 
-1. 下载或 clone 本仓库
-2. 双击 **`install.bat`** — 同上
-3. 以后每次启动：双击 **`start.bat`**
+### 运行
 
-> 需要预先安装 [Python 3.9+](https://www.python.org/downloads/)，安装时勾选 **Add Python to PATH**
+- **Windows**：解压后双击 `sanhu.exe`
+- **macOS / Linux**：解压后在终端运行 `./sanhu`（macOS 首次可能提示"无法验证开发者"，右键 → 打开 → 确认）
 
-### 命令行（高级用户）
+然后浏览器打开 [http://localhost:8000](http://localhost:8000)。
+
+> **首次启动**会自动下载初始数据（约 1MB 的基金档案 / 估值历史），需要联网一次；之后即可离线使用。详见 [首次启动流程](docs/first-run.md)。
+
+### 从源码构建（开发者）
 
 ```bash
 git clone https://github.com/pakoo/sanhu.git
 cd sanhu
-pip install -r requirements.txt
-python scripts/init_db.py
-python app.py
+go build -o sanhu ./cmd/sanhu
+./sanhu
 ```
-
-浏览器打开 [http://localhost:8000](http://localhost:8000)
 
 ---
 
@@ -166,8 +134,8 @@ OCR 自动提取基金名称、持有金额、持有收益，可手动修正后�
 
 ## 技术栈
 
-- **后端**：Python + FastAPI + SQLite
-- **前端**：原生 HTML/CSS/JS（无框架依赖）
+- **后端**：Go（单二进制，前后端一起打包，无运行时依赖）+ SQLite
+- **前端**：原生 HTML/CSS/JS（无框架依赖），通过 `embed` 编译进二进制
 - **图表**：ECharts
 
 数据全部本地存储，不上传任何个人信息。
@@ -184,9 +152,9 @@ OCR 自动提取基金名称、持有金额、持有收益，可手动修正后�
 
 ## 数据说明
 
-### 内置数据（`data/seed.sql`）
+### 初始数据（首次启动下载）
 
-首次安装时自动加载，无需联网：
+首次启动时自动从 Release 下载初始参考数据（约 1MB，gzip 压缩），灌入本地数据库；之后离线可用：
 
 | 数据表 | 内容 | 行数 |
 |---|---|---|
@@ -214,6 +182,16 @@ OCR 自动提取基金名称、持有金额、持有收益，可手动修正后�
 
 ## 更新日志
 
+### v2.0（2026-06）
+
+**后端全面重写为 Go**
+
+- 后端从 Python + FastAPI 迁移到 Go，前后端打包为**单个可执行文件**，下载即用，无需安装 Python 或任何依赖
+- 初始数据改为**首次启动自动下载**（约 1MB），安装包体积大幅减小
+- 内置跨平台编译（Windows / macOS / Linux）与自动更新
+- 修复迁移脚本与代码 schema 不一致的问题，全新安装可直接运行
+- Python 旧版保留在 `final-python` tag
+
 ### v1.1（2026-04）
 
 **功能优化**
@@ -232,17 +210,17 @@ OCR 自动提取基金名称、持有金额、持有收益，可手动修正后�
 
 ## 常见问题
 
-**`cannot import name '_imaging' from 'PIL'`**
+**macOS 提示"无法验证开发者" / "已损坏"**
 
-Pillow 的 C 扩展与当前 Python 版本不匹配，通常发生在多 Python 环境或混用 conda/homebrew 时。解决方法：
+未签名的二进制被 Gatekeeper 拦截。右键点击 → 打开 → 确认；或终端运行 `xattr -d com.apple.quarantine ./sanhu`。
 
-```bash
-pip install --force-reinstall Pillow
-```
+**首次启动提示下载初始数据失败**
 
-**`python: command not found` / `pip: command not found`**
+首次启动需联网下载一次初始数据。若所在网络访问 GitHub 受限，可设置环境变量 `SANHU_SEED_URL` 指向可达的镜像地址；下载失败不影响启动，重启会自动重试。
 
-Python 未加入系统 PATH。Windows 用户重新运行 Python 安装程序，勾选 **Add Python to PATH**；macOS 用户尝试用 `python3` / `pip3` 替代。
+**端口 8000 被占用**
+
+设置环境变量 `SANHU_PORT` 改用其它端口，如 `SANHU_PORT=8090`。
 
 **截图上传后提示"未能识别到基金数据"**
 

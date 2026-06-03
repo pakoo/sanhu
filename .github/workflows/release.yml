@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.goos }}-${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: windows
+            goarch: amd64
+            suffix: .exe
+            asset_name: sanhu-windows-amd64.exe
+          - goos: darwin
+            goarch: amd64
+            suffix: ""
+            asset_name: sanhu-darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            suffix: ""
+            asset_name: sanhu-darwin-arm64
+          - goos: linux
+            goarch: amd64
+            suffix: ""
+            asset_name: sanhu-linux-amd64
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+          cache: true
+
+      - name: Build
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "0"
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          go build \
+            -ldflags "-s -w -X main.version=${VERSION} -X main.gitTag=${GITHUB_REF_NAME}" \
+            -o sanhu${{ matrix.suffix }} \
+            ./cmd/sanhu/
+
+      - name: Package (Windows zip)
+        if: matrix.goos == 'windows'
+        run: |
+          mkdir -p dist
+          cp sanhu.exe dist/
+          cd dist && zip -9 ../sanhu-windows-amd64.zip sanhu.exe
+
+      - name: Package (Unix tar.gz)
+        if: matrix.goos != 'windows'
+        run: |
+          mkdir -p dist
+          cp sanhu${{ matrix.suffix }} dist/${{ matrix.asset_name }}
+          tar -czf ${{ matrix.asset_name }}.tar.gz -C dist ${{ matrix.asset_name }}
+
+      - name: Upload artifact (Windows)
+        if: matrix.goos == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: sanhu-windows-amd64.zip
+
+      - name: Upload artifact (Unix)
+        if: matrix.goos != 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.asset_name }}.tar.gz
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          # seed/seed.sql.gz 作为初始数据资产随 release 发布；
+          # 首启空库时由 internal/bootstrap 从 releases/latest/download/seed.sql.gz 下载。
+          files: |
+            artifacts/sanhu-windows-amd64/sanhu-windows-amd64.zip
+            artifacts/sanhu-darwin-amd64/sanhu-darwin-amd64.tar.gz
+            artifacts/sanhu-darwin-arm64/sanhu-darwin-arm64.tar.gz
+            artifacts/sanhu-linux-amd64/sanhu-linux-amd64.tar.gz
+            seed/seed.sql.gz

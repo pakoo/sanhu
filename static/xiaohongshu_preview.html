@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>散户 sanhu · 小红书轮播图</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{
+  background:#1a1a2e;
+  font-family:'Noto Sans SC',sans-serif;
+  display:flex;flex-direction:column;align-items:center;
+  gap:32px;padding:72px 20px 60px;
+}
+.controls{
+  position:fixed;top:0;left:0;right:0;
+  background:rgba(13,13,23,0.96);
+  backdrop-filter:blur(12px);
+  padding:14px 24px;
+  display:flex;align-items:center;justify-content:center;gap:16px;
+  z-index:100;border-bottom:1px solid #2a2a3e;
+}
+.controls span{color:#666;font-size:13px;}
+.btn-dl{
+  background:#4F46E5;color:#fff;border:none;
+  padding:10px 28px;border-radius:24px;
+  font-size:14px;font-weight:700;cursor:pointer;
+  font-family:inherit;transition:all .2s;
+}
+.btn-dl:hover{transform:scale(1.03);background:#4338ca;}
+.btn-dl:disabled{background:#333;color:#666;cursor:wait;}
+
+.card{
+  width:540px;height:720px;
+  border-radius:8px;overflow:hidden;
+  flex-shrink:0;position:relative;
+  box-shadow:0 0 0 1px rgba(255,255,255,0.08), 0 20px 60px rgba(0,0,0,0.5);
+}
+
+/* ── CARD 1: COVER ── */
+#card1{
+  background:linear-gradient(145deg,#0d0d1a 0%,#1a1040 50%,#0d0d1a 100%);
+}
+.c1-noise{
+  position:absolute;inset:0;
+  background:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity:0.4;
+}
+.c1-glow{
+  position:absolute;
+  top:160px;left:50%;transform:translateX(-50%);
+  width:320px;height:320px;
+  background:radial-gradient(circle,rgba(79,70,229,0.25) 0%,transparent 70%);
+  pointer-events:none;
+}
+.c1-inner{
+  position:relative;z-index:2;
+  height:100%;display:flex;flex-direction:column;
+  padding:48px 44px;
+}
+.c1-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:rgba(79,70,229,0.2);border:1px solid rgba(79,70,229,0.5);
+  border-radius:20px;padding:6px 14px;width:fit-content;
+  font-size:12px;color:#a5b4fc;font-weight:500;margin-bottom:40px;
+}
+.c1-badge::before{content:'';width:6px;height:6px;border-radius:50%;background:#4F46E5;}
+.c1-title{
+  font-size:52px;font-weight:900;line-height:1.15;
+  color:#fff;margin-bottom:20px;letter-spacing:-1px;
+}
+.c1-title em{color:#4F46E5;font-style:normal;}
+.c1-sub{
+  font-size:17px;color:#94a3b8;line-height:1.7;
+  font-weight:400;margin-bottom:auto;
+}
+.c1-stats{
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  gap:12px;margin-top:40px;
+}
+.c1-stat{
+  background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px;padding:14px 12px;text-align:center;
+}
+.c1-stat-num{
+  font-size:20px;font-weight:800;color:#a5b4fc;
+  display:block;margin-bottom:4px;
+}
+.c1-stat-label{font-size:11px;color:#4a5568;}
+.c1-bottom{
+  margin-top:28px;display:flex;align-items:center;
+  justify-content:space-between;
+}
+.c1-brand{font-size:13px;color:#4a5568;font-weight:500;}
+.c1-pg{font-size:12px;color:#2d3748;}
+
+/* ── CARD 2: 截图导入 ── */
+#card2{background:#0d0d1a;}
+.c2-inner{
+  height:100%;display:flex;flex-direction:column;
+  padding:36px 36px 32px;
+}
+.c2-pg{font-size:11px;color:#374151;font-weight:500;letter-spacing:2px;margin-bottom:20px;}
+.c2-title{font-size:28px;font-weight:800;color:#fff;margin-bottom:6px;}
+.c2-sub{font-size:13px;color:#6b7280;margin-bottom:24px;}
+
+.steps{display:flex;flex-direction:column;gap:10px;margin-bottom:20px;}
+.step{
+  display:flex;align-items:flex-start;gap:14px;
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;padding:14px 16px;
+}
+.step-num{
+  width:28px;height:28px;border-radius:50%;
+  background:#4F46E5;color:#fff;
+  font-size:13px;font-weight:800;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.step-text{}
+.step-title{font-size:14px;font-weight:700;color:#e2e8f0;margin-bottom:2px;}
+.step-desc{font-size:12px;color:#4b5563;line-height:1.5;}
+
+.screenshot-wrap{
+  flex:1;border-radius:10px;overflow:hidden;
+  border:1px solid rgba(79,70,229,0.3);
+  position:relative;min-height:0;
+}
+.screenshot-wrap img{
+  width:100%;height:100%;object-fit:cover;object-position:top;
+  display:block;
+}
+.screenshot-overlay{
+  position:absolute;bottom:0;left:0;right:0;height:60px;
+  background:linear-gradient(transparent,#0d0d1a);
+}
+
+/* ── CARD 3: 风险分析 ── */
+#card3{background:#0d0d1a;}
+.c3-inner{
+  height:100%;display:flex;flex-direction:column;
+  padding:36px 36px 32px;
+}
+.c3-pg{font-size:11px;color:#374151;font-weight:500;letter-spacing:2px;margin-bottom:20px;}
+.c3-title{font-size:28px;font-weight:800;color:#fff;margin-bottom:6px;}
+.c3-sub{font-size:13px;color:#6b7280;margin-bottom:20px;}
+
+.risk-items{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;}
+.risk-item{
+  display:flex;align-items:flex-start;gap:12px;
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);
+  border-radius:10px;padding:12px 14px;
+}
+.risk-dot{
+  width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:3px;
+}
+.risk-dot.red{background:#ef4444;}
+.risk-dot.yellow{background:#f59e0b;}
+.risk-dot.blue{background:#4F46E5;}
+.risk-text{}
+.risk-label{font-size:13px;font-weight:700;color:#e2e8f0;margin-bottom:2px;}
+.risk-desc{font-size:11px;color:#4b5563;line-height:1.5;}
+
+.c3-shot{
+  flex:1;border-radius:10px;overflow:hidden;
+  border:1px solid rgba(255,255,255,0.06);
+  position:relative;min-height:0;
+}
+.c3-shot img{
+  width:100%;height:100%;object-fit:cover;object-position:top;
+}
+.c3-shot-overlay{
+  position:absolute;bottom:0;left:0;right:0;height:50px;
+  background:linear-gradient(transparent,#0d0d1a);
+}
+
+/* ── CARD 4: 选基 + 模拟 ── */
+#card4{background:#0d0d1a;}
+.c4-inner{
+  height:100%;display:flex;flex-direction:column;
+  padding:36px 36px 32px;
+}
+.c4-pg{font-size:11px;color:#374151;font-weight:500;letter-spacing:2px;margin-bottom:20px;}
+.c4-title{font-size:28px;font-weight:800;color:#fff;margin-bottom:6px;}
+.c4-sub{font-size:13px;color:#6b7280;margin-bottom:18px;}
+
+.feature-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+.feature-card{
+  background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);
+  border-radius:12px;padding:16px 14px;
+}
+.feature-icon{font-size:22px;margin-bottom:8px;}
+.feature-name{font-size:13px;font-weight:800;color:#e2e8f0;margin-bottom:4px;}
+.feature-desc{font-size:11px;color:#4b5563;line-height:1.5;}
+.feature-tag{
+  display:inline-block;margin-top:6px;
+  padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600;
+}
+.feature-tag.green{background:rgba(16,185,129,0.15);color:#34d399;}
+.feature-tag.indigo{background:rgba(79,70,229,0.15);color:#a5b4fc;}
+
+.c4-shot{
+  flex:1;border-radius:10px;overflow:hidden;
+  border:1px solid rgba(255,255,255,0.06);
+  position:relative;min-height:0;
+}
+.c4-shot img{
+  width:100%;height:100%;object-fit:cover;object-position:top;
+}
+.c4-shot-overlay{
+  position:absolute;bottom:0;left:0;right:0;height:50px;
+  background:linear-gradient(transparent,#0d0d1a);
+}
+
+/* ── CARD 5: CTA ── */
+#card5{background:linear-gradient(145deg,#0d0d1a 0%,#1a1040 60%,#0d0d1a 100%);}
+.c5-glow{
+  position:absolute;
+  bottom:80px;left:50%;transform:translateX(-50%);
+  width:300px;height:200px;
+  background:radial-gradient(ellipse,rgba(79,70,229,0.2) 0%,transparent 70%);
+}
+.c5-inner{
+  position:relative;z-index:2;
+  height:100%;display:flex;flex-direction:column;
+  padding:48px 44px 44px;
+}
+.c5-pg{font-size:11px;color:#374151;font-weight:500;letter-spacing:2px;margin-bottom:36px;}
+.c5-title{font-size:32px;font-weight:900;color:#fff;line-height:1.3;margin-bottom:12px;}
+.c5-title em{color:#4F46E5;font-style:normal;}
+.c5-sub{font-size:14px;color:#6b7280;margin-bottom:36px;line-height:1.7;}
+
+.checklist{display:flex;flex-direction:column;gap:12px;margin-bottom:auto;}
+.check-item{
+  display:flex;align-items:center;gap:12px;
+  font-size:14px;color:#d1d5db;font-weight:500;
+}
+.check-icon{
+  width:24px;height:24px;border-radius:50%;
+  background:rgba(79,70,229,0.2);border:1px solid rgba(79,70,229,0.4);
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;font-size:12px;
+}
+
+.c5-bottom{
+  border-top:1px solid rgba(255,255,255,0.06);
+  padding-top:24px;
+}
+.c5-cta-box{
+  background:rgba(79,70,229,0.1);border:1px solid rgba(79,70,229,0.3);
+  border-radius:12px;padding:16px 20px;margin-bottom:16px;text-align:center;
+}
+.c5-cta-main{font-size:16px;font-weight:800;color:#a5b4fc;margin-bottom:4px;}
+.c5-cta-sub{font-size:12px;color:#4b5563;}
+.c5-footnote{
+  display:flex;align-items:center;justify-content:space-between;
+}
+.c5-brand{font-size:12px;color:#374151;font-weight:600;}
+.c5-link{font-size:11px;color:#374151;}
+</style>
+</head>
+<body>
+
+<div class="controls">
+  <span>共 5 张 · 3:4 · 540×720</span>
+  <button class="btn-dl" id="dlBtn" onclick="dlAll()">⬇ 一键下载全部图片</button>
+  <span id="prog"></span>
+</div>
+
+<!-- ── CARD 1: COVER ── -->
+<div class="card" id="card1">
+  <div class="c1-noise"></div>
+  <div class="c1-glow"></div>
+  <div class="c1-inner">
+    <div class="c1-badge">开源免费 · 本地运行 · 数据不出本机</div>
+    <div class="c1-title">买基金<br>老<em>亏</em>？<br>先自查</div>
+    <div class="c1-sub">上传支付宝截图<br>30秒看清你的持仓到底健不健康</div>
+    <div class="c1-stats">
+      <div class="c1-stat">
+        <span class="c1-stat-num">8000+</span>
+        <div class="c1-stat-label">基金数据库</div>
+      </div>
+      <div class="c1-stat">
+        <span class="c1-stat-num">30s</span>
+        <div class="c1-stat-label">截图导入</div>
+      </div>
+      <div class="c1-stat">
+        <span class="c1-stat-num">免费</span>
+        <div class="c1-stat-label">开源项目</div>
+      </div>
+    </div>
+    <div class="c1-bottom">
+      <div class="c1-brand">散户 sanhu</div>
+      <div class="c1-pg">01 / 05</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CARD 2: 截图导入 ── -->
+<div class="card" id="card2">
+  <div class="c2-inner">
+    <div class="c2-pg">02 / 05 · 导入持仓</div>
+    <div class="c2-title">截图上传，自动识别</div>
+    <div class="c2-sub">不用手动填代码，OCR 自动提取所有基金</div>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">
+          <div class="step-title">支付宝截图</div>
+          <div class="step-desc">打开持有页面 → 截图 → 上传</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">
+          <div class="step-title">自动识别，核对数据</div>
+          <div class="step-desc">基金名称 / 持有金额 / 持有收益全部自动填好，可手动修改</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">
+          <div class="step-title">确认导入</div>
+          <div class="step-desc">总览、风险、配置一键可查</div>
+        </div>
+      </div>
+    </div>
+    <div class="screenshot-wrap">
+      <img src="/static/4.jpg" alt="OCR识别">
+      <div class="screenshot-overlay"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CARD 3: 风险分析 ── -->
+<div class="card" id="card3">
+  <div class="c3-inner">
+    <div class="c3-pg">03 / 05 · 风险分析</div>
+    <div class="c3-title">你的持仓<br>暗藏哪些风险</div>
+    <div class="c3-sub">不只是看涨跌，更看你有没有在裸奔</div>
+    <div class="risk-items">
+      <div class="risk-item">
+        <div class="risk-dot red"></div>
+        <div class="risk-text">
+          <div class="risk-label">持仓集中度</div>
+          <div class="risk-desc">多只基金底层买的是同一批股票 → 分散了个寂寞</div>
+        </div>
+      </div>
+      <div class="risk-item">
+        <div class="risk-dot yellow"></div>
+        <div class="risk-text">
+          <div class="risk-label">波动率预警</div>
+          <div class="risk-desc">组合整体波动率过高 → 一跌就承受不住的预警</div>
+        </div>
+      </div>
+      <div class="risk-item">
+        <div class="risk-dot blue"></div>
+        <div class="risk-text">
+          <div class="risk-label">相关性热力图</div>
+          <div class="risk-desc">看哪两只基金是"同进退" → 真正的分散应该低相关</div>
+        </div>
+      </div>
+    </div>
+    <div class="c3-shot">
+      <img src="/static/5.jpg" alt="风险分析">
+      <div class="c3-shot-overlay"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CARD 4: 选基 + 模拟 ── -->
+<div class="card" id="card4">
+  <div class="c4-inner">
+    <div class="c4-pg">04 / 05 · 选基 &amp; 模拟</div>
+    <div class="c4-title">下一步该<br>买什么、怎么买</div>
+    <div class="c4-sub">诊断缺口 + 不花钱先验证</div>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feature-icon">🎯</div>
+        <div class="feature-name">智能选基</div>
+        <div class="feature-desc">自动诊断配置缺口，推荐候选基金附评分和建议仓位</div>
+        <span class="feature-tag indigo">8000+ 基金</span>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">🧪</div>
+        <div class="feature-name">模拟盘</div>
+        <div class="feature-desc">用历史真实净值验证定投策略，或虚拟建仓先观察</div>
+        <span class="feature-tag green">不花真钱</span>
+      </div>
+    </div>
+    <div class="c4-shot">
+      <img src="/static/7.jpg" alt="选基向导">
+      <div class="c4-shot-overlay"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CARD 5: CTA ── -->
+<div class="card" id="card5">
+  <div class="c5-glow"></div>
+  <div class="c5-inner">
+    <div class="c5-pg">05 / 05 · 总结</div>
+    <div class="c5-title">看懂持仓<br>才能<em>赚到钱</em></div>
+    <div class="c5-sub">工具帮你分析，买卖由你决定</div>
+    <div class="checklist">
+      <div class="check-item">
+        <div class="check-icon">📸</div>
+        支付宝截图 → 30秒导入所有持仓
+      </div>
+      <div class="check-item">
+        <div class="check-icon">⚠️</div>
+        自动检测持仓集中风险 + 波动预警
+      </div>
+      <div class="check-item">
+        <div class="check-icon">🔍</div>
+        穿透基金看底层行业真实暴露
+      </div>
+      <div class="check-item">
+        <div class="check-icon">🎯</div>
+        诊断配置缺口，推荐候选基金
+      </div>
+      <div class="check-item">
+        <div class="check-icon">🤖</div>
+        一键生成 Prompt，发给 AI 深度分析
+      </div>
+    </div>
+    <div class="c5-bottom">
+      <div class="c5-cta-box">
+        <div class="c5-cta-main">开源免费，想要 GitHub 地址评论区扣 1</div>
+        <div class="c5-cta-sub">Mac / Windows 双击安装 · 数据不出本机</div>
+      </div>
+      <div class="c5-footnote">
+        <div class="c5-brand">散户 sanhu</div>
+        <div class="c5-link">github.com/pakoo/sanhu</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function dlAll(){
+  var btn=document.getElementById('dlBtn'),msg=document.getElementById('prog');
+  var total=5;
+  btn.disabled=true;btn.textContent='⏳ 导出中...';
+  for(var i=1;i<=total;i++){
+    msg.textContent='正在导出第 '+i+'/'+total+' 张...';
+    try{
+      var c=await html2canvas(document.getElementById('card'+i),{
+        scale:3,useCORS:true,allowTaint:true,
+        backgroundColor:'#0d0d1a',
+        width:540,height:720
+      });
+      var a=document.createElement('a');
+      a.download='sanhu_xhs_'+i+'.png';
+      a.href=c.toDataURL('image/png');a.click();
+      await new Promise(function(r){setTimeout(r,800)});
+    }catch(e){console.error(e)}
+  }
+  btn.disabled=false;btn.textContent='⬇ 一键下载全部图片';
+  msg.textContent='✅ 完成！';
+  setTimeout(function(){msg.textContent=''},3000);
+}
+</script>
+</body>
+</html>

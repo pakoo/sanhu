@@ -1,19 +1,15 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-venv/
+# Go build artifacts
+/sanhu
+/sanhu.exe
+dist/
+*.old
+.gocache/
 
-# 数据库（用户数据不入库，seed.sql 入库）
-data/*.db
-data/*.db-shm
-data/*.db-wal
-jijin.db
-data/funds.db
-
-# 日志
-logs/
+# 数据库（运行时生成，不入库；初始数据见 seed/seed.sql.gz）
+data/
+*.db
+*.db-shm
+*.db-wal
 
 # 系统
 .DS_Store
