@@ -168,6 +168,7 @@ func GetLatestScores(db *sqlx.DB) ([]FundScore, error) {
 		INNER JOIN (
 			SELECT code, MAX(date) AS max_date FROM fund_scores GROUP BY code
 		) latest ON s.code=latest.code AND s.date=latest.max_date
+		INNER JOIN funds fn ON fn.code=s.code
 		ORDER BY s.total_score DESC`)
 	return scores, err
 }

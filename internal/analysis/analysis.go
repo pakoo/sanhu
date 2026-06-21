@@ -3,6 +3,7 @@ package analysis
 import (
 	"database/sql"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -15,15 +16,54 @@ type StockExposure struct {
 	WeightedPct float64 `json:"weighted_pct"`
 }
 
+// FundWeight 单只基金对某股票的持仓权重(用于 overlap 明细)
+type FundWeight struct {
+	Code     string  `json:"code"`
+	FundName string  `json:"fund_name"`
+	Weight   float64 `json:"weight"`
+}
+
+// OverlapStock 一只被多只基金共同持有的股票
+type OverlapStock struct {
+	StockCode        string       `json:"stock_code"`
+	StockName        string       `json:"stock_name"`
+	AppearIn         []string     `json:"appear_in"`
+	AppearCount      int          `json:"appear_count"`
+	TotalExposurePct float64      `json:"total_exposure_pct"`
+	FundWeights      []FundWeight `json:"fund_weights"`
+}
+
 type OverlapResult struct {
-	TopStocks      []StockExposure `json:"top_stocks"`
-	HHI            float64         `json:"hhi"`
-	DiversityScore float64         `json:"diversity_score"`
+	OverlapStocks        []OverlapStock `json:"overlap_stocks"`
+	DiversificationScore float64        `json:"diversification_score"`
+	TotalFundsAnalyzed   int            `json:"total_funds_analyzed"`
+	ReportDate           string         `json:"report_date"`
 }
 
 type IndustryWeight struct {
 	Industry string  `json:"industry"`
 	Weight   float64 `json:"weight"`
+}
+
+// IndustryFund 某行业内单只基金的权重明细
+type IndustryFund struct {
+	Code     string  `json:"code"`
+	FundName string  `json:"fund_name"`
+	Weight   float64 `json:"weight"`
+}
+
+// IndustryAgg 某行业的组合加权占比 + 基金拆解
+type IndustryAgg struct {
+	Industry      string         `json:"industry"`
+	TotalWeight   float64        `json:"total_weight"`
+	FundBreakdown []IndustryFund `json:"fund_breakdown"`
+}
+
+// IndustryBreakdownResult 与 Python get_industry_breakdown 对齐
+type IndustryBreakdownResult struct {
+	Industries    []IndustryAgg `json:"industries"`
+	ReportDate    string        `json:"report_date"`
+	FundsAnalyzed []string      `json:"funds_analyzed"`
 }
 
 type HoldingsChange struct {
@@ -35,105 +75,146 @@ type HoldingsChange struct {
 	Unchanged  []string `json:"unchanged"`
 }
 
+// GetHoldingsOverlap 复刻 Python get_holdings_overlap：
+// 非债基金间的「重叠持股」——出现在 ≥2 只基金里的股票，按组合加权敞口排序，
+// 并给出分散度评分(1/赫芬达尔指数)。
 func GetHoldingsOverlap(db *sqlx.DB) (*OverlapResult, error) {
-	positions, totalValue, err := portfolioPositions(db)
-	if err != nil {
-		return nil, err
-	}
-	if totalValue == 0 {
-		return &OverlapResult{}, nil
-	}
-
 	fundCodeCol, err := chooseColumn(db, "fund_holdings", "fund_code", "code")
 	if err != nil {
 		return nil, err
 	}
 
+	// 非债持仓基金 + 当前市值
+	type fundRow struct {
+		Code   string  `db:"code"`
+		Name   string  `db:"name"`
+		Shares float64 `db:"shares"`
+	}
+	var frows []fundRow
+	if err := db.Select(&frows, `
+		SELECT f.code, COALESCE(f.name,'') AS name, COALESCE(h.shares,0) AS shares
+		FROM funds f JOIN holdings h ON f.code=h.code
+		WHERE f.category != 'bond'`); err != nil {
+		return nil, fmt.Errorf("query overlap funds: %w", err)
+	}
+
+	type fundInfo struct {
+		name       string
+		pctOfTotal float64 // 0-100
+	}
+	fundMap := map[string]*fundInfo{}
+	totalMV := 0.0
+	mvOf := map[string]float64{}
+	for _, r := range frows {
+		nav, _ := latestNav(db, r.Code)
+		mv := nav * r.Shares
+		mvOf[r.Code] = mv
+		totalMV += mv
+		fundMap[r.Code] = &fundInfo{name: r.Name}
+	}
+	for code, fi := range fundMap {
+		if totalMV > 0 {
+			fi.pctOfTotal = mvOf[code] / totalMV * 100
+		}
+	}
+
+	if len(fundMap) == 0 {
+		return &OverlapResult{OverlapStocks: []OverlapStock{}, DiversificationScore: 1.0}, nil
+	}
+
+	// stock_code -> {name, [{fund, weight}]}
+	type sf struct {
+		code   string
+		weight float64
+	}
+	type stockInfo struct {
+		name  string
+		funds []sf
+	}
+	stockMap := map[string]*stockInfo{}
+	latestDate := ""
 	type holdingRow struct {
 		StockCode string  `db:"stock_code"`
 		StockName string  `db:"stock_name"`
 		Weight    float64 `db:"weight"`
 	}
-
-	exposures := map[string]*StockExposure{}
-	for _, position := range positions {
-		reportDate, err := maxReportDate(db, "fund_holdings", fundCodeCol, position.Code)
+	for code := range fundMap {
+		reportDate, err := maxReportDate(db, "fund_holdings", fundCodeCol, code)
 		if err != nil || reportDate == "" {
 			continue
 		}
-
+		if reportDate > latestDate {
+			latestDate = reportDate
+		}
 		query := fmt.Sprintf(`
-			SELECT stock_code, stock_name, COALESCE(weight, 0) AS weight
-			FROM fund_holdings
-			WHERE %s=? AND report_date=?
-		`, fundCodeCol)
-
+			SELECT stock_code, stock_name, COALESCE(weight,0) AS weight
+			FROM fund_holdings WHERE %s=? AND report_date=?`, fundCodeCol)
 		var rows []holdingRow
-		if err := db.Select(&rows, query, position.Code, reportDate); err != nil {
-			return nil, fmt.Errorf("query fund holdings %s: %w", position.Code, err)
+		if err := db.Select(&rows, query, code, reportDate); err != nil {
+			return nil, fmt.Errorf("query fund holdings %s: %w", code, err)
 		}
-
-		portfolioWeight := position.Value / totalValue
 		for _, row := range rows {
-			exposurePct := portfolioWeight * row.Weight
-			item := exposures[row.StockCode]
-			if item == nil {
-				item = &StockExposure{
-					StockCode: row.StockCode,
-					StockName: row.StockName,
-				}
-				exposures[row.StockCode] = item
+			si := stockMap[row.StockCode]
+			if si == nil {
+				si = &stockInfo{name: row.StockName}
+				stockMap[row.StockCode] = si
 			}
-			item.WeightedPct += exposurePct
-			if item.StockName == "" {
-				item.StockName = row.StockName
-			}
+			si.funds = append(si.funds, sf{code: code, weight: row.Weight})
 		}
 	}
 
-	topStocks := make([]StockExposure, 0, len(exposures))
-	totalExposurePct := 0.0
-	for _, exposure := range exposures {
-		topStocks = append(topStocks, *exposure)
-		totalExposurePct += exposure.WeightedPct
-	}
-	sort.Slice(topStocks, func(i, j int) bool {
-		if topStocks[i].WeightedPct == topStocks[j].WeightedPct {
-			return topStocks[i].StockCode < topStocks[j].StockCode
+	overlap := make([]OverlapStock, 0)
+	for sc, si := range stockMap {
+		if len(si.funds) < 2 {
+			continue
 		}
-		return topStocks[i].WeightedPct > topStocks[j].WeightedPct
+		total := 0.0
+		fws := make([]FundWeight, 0, len(si.funds))
+		appearIn := make([]string, 0, len(si.funds))
+		for _, fw := range si.funds {
+			fi := fundMap[fw.code]
+			total += fi.pctOfTotal * fw.weight / 100
+			fws = append(fws, FundWeight{Code: fw.code, FundName: fi.name, Weight: fw.weight})
+			appearIn = append(appearIn, fw.code)
+		}
+		overlap = append(overlap, OverlapStock{
+			StockCode:        sc,
+			StockName:        si.name,
+			AppearIn:         appearIn,
+			AppearCount:      len(si.funds),
+			TotalExposurePct: math.Round(total*10000) / 10000,
+			FundWeights:      fws,
+		})
+	}
+	sort.Slice(overlap, func(i, j int) bool {
+		if overlap[i].TotalExposurePct == overlap[j].TotalExposurePct {
+			return overlap[i].StockCode < overlap[j].StockCode
+		}
+		return overlap[i].TotalExposurePct > overlap[j].TotalExposurePct
 	})
-	if len(topStocks) > 10 {
-		topStocks = topStocks[:10]
+
+	// 分散度评分 = 1 / 赫芬达尔指数(基金占比平方和)
+	herfindahl := 0.0
+	for _, fi := range fundMap {
+		p := fi.pctOfTotal / 100
+		herfindahl += p * p
+	}
+	divScore := 1.0
+	if herfindahl > 0 {
+		divScore = math.Round(1/herfindahl*100) / 100
 	}
 
-	hhi := 0.0
-	if totalExposurePct > 0 {
-		for _, exposure := range exposures {
-			w := exposure.WeightedPct / totalExposurePct
-			hhi += w * w
-		}
-	}
-
-	result := &OverlapResult{
-		TopStocks: topStocks,
-		HHI:       hhi,
-	}
-	if hhi > 0 {
-		result.DiversityScore = 1 / hhi
-	}
-	return result, nil
+	return &OverlapResult{
+		OverlapStocks:        overlap,
+		DiversificationScore: divScore,
+		TotalFundsAnalyzed:   len(fundMap),
+		ReportDate:           latestDate,
+	}, nil
 }
 
-func GetIndustryBreakdown(db *sqlx.DB) ([]IndustryWeight, error) {
-	positions, totalValue, err := portfolioPositions(db)
-	if err != nil {
-		return nil, err
-	}
-	if totalValue == 0 {
-		return nil, nil
-	}
-
+// GetIndustryBreakdown 复刻 Python get_industry_breakdown：
+// 非债基金按市值占比加权的行业暴露 + 每行业的基金拆解。
+func GetIndustryBreakdown(db *sqlx.DB) (*IndustryBreakdownResult, error) {
 	fundCodeCol, err := chooseColumn(db, "fund_industry", "fund_code", "code")
 	if err != nil {
 		return nil, err
@@ -143,46 +224,91 @@ func GetIndustryBreakdown(db *sqlx.DB) ([]IndustryWeight, error) {
 		return nil, err
 	}
 
-	type row struct {
+	// 非债持仓基金 + 市值占比
+	type fundRow struct {
+		Code   string  `db:"code"`
+		Name   string  `db:"name"`
+		Shares float64 `db:"shares"`
+	}
+	var frows []fundRow
+	if err := db.Select(&frows, `
+		SELECT f.code, COALESCE(f.name,'') AS name, COALESCE(h.shares,0) AS shares
+		FROM funds f JOIN holdings h ON f.code=h.code
+		WHERE f.category != 'bond'`); err != nil {
+		return nil, fmt.Errorf("query industry funds: %w", err)
+	}
+	totalMV := 0.0
+	mvOf := map[string]float64{}
+	nameOf := map[string]string{}
+	codes := make([]string, 0, len(frows))
+	for _, r := range frows {
+		nav, _ := latestNav(db, r.Code)
+		mv := nav * r.Shares
+		mvOf[r.Code] = mv
+		nameOf[r.Code] = r.Name
+		totalMV += mv
+		codes = append(codes, r.Code)
+	}
+
+	type entry struct {
+		code, name string
+		weight     float64
+		fundPct    float64
+	}
+	industryMap := map[string][]entry{}
+	latestDate := ""
+	analyzed := make([]string, 0)
+	type irow struct {
 		Industry string  `db:"industry"`
 		Weight   float64 `db:"weight"`
 	}
-
-	weights := map[string]float64{}
-	for _, position := range positions {
-		reportDate, err := maxReportDate(db, "fund_industry", fundCodeCol, position.Code)
+	for _, code := range codes {
+		reportDate, err := maxReportDate(db, "fund_industry", fundCodeCol, code)
 		if err != nil || reportDate == "" {
 			continue
 		}
-
+		if reportDate > latestDate {
+			latestDate = reportDate
+		}
+		analyzed = append(analyzed, code)
 		query := fmt.Sprintf(`
-			SELECT %s AS industry, COALESCE(weight, 0) AS weight
-			FROM fund_industry
-			WHERE %s=? AND report_date=?
-		`, industryCol, fundCodeCol)
-
-		var rows []row
-		if err := db.Select(&rows, query, position.Code, reportDate); err != nil {
-			return nil, fmt.Errorf("query fund industry %s: %w", position.Code, err)
+			SELECT %s AS industry, COALESCE(weight,0) AS weight
+			FROM fund_industry WHERE %s=? AND report_date=?`, industryCol, fundCodeCol)
+		var rows []irow
+		if err := db.Select(&rows, query, code, reportDate); err != nil {
+			return nil, fmt.Errorf("query fund industry %s: %w", code, err)
 		}
-
-		portfolioWeight := position.Value / totalValue
-		for _, row := range rows {
-			weights[row.Industry] += portfolioWeight * row.Weight
+		fundPct := 0.0
+		if totalMV > 0 {
+			fundPct = mvOf[code] / totalMV * 100
+		}
+		for _, r := range rows {
+			industryMap[r.Industry] = append(industryMap[r.Industry], entry{code: code, name: nameOf[code], weight: r.Weight, fundPct: fundPct})
 		}
 	}
 
-	out := make([]IndustryWeight, 0, len(weights))
-	for industry, weight := range weights {
-		out = append(out, IndustryWeight{Industry: industry, Weight: weight})
-	}
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].Weight == out[j].Weight {
-			return out[i].Industry < out[j].Industry
+	industries := make([]IndustryAgg, 0, len(industryMap))
+	for ind, entries := range industryMap {
+		total := 0.0
+		fb := make([]IndustryFund, 0, len(entries))
+		for _, e := range entries {
+			total += e.weight * e.fundPct / 100
+			fb = append(fb, IndustryFund{Code: e.code, FundName: e.name, Weight: e.weight})
 		}
-		return out[i].Weight > out[j].Weight
+		industries = append(industries, IndustryAgg{Industry: ind, TotalWeight: math.Round(total*100) / 100, FundBreakdown: fb})
+	}
+	sort.Slice(industries, func(i, j int) bool {
+		if industries[i].TotalWeight == industries[j].TotalWeight {
+			return industries[i].Industry < industries[j].Industry
+		}
+		return industries[i].TotalWeight > industries[j].TotalWeight
 	})
-	return out, nil
+
+	return &IndustryBreakdownResult{
+		Industries:    industries,
+		ReportDate:    latestDate,
+		FundsAnalyzed: analyzed,
+	}, nil
 }
 
 func GetHoldingsChanges(db *sqlx.DB, code string) (*HoldingsChange, error) {

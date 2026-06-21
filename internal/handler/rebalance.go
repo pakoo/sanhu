@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"math"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -18,7 +19,24 @@ func (h *Handler) GetRebalanceSuggestions(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"suggestions": suggestions})
+	// 与 Python 对齐：返回 {suggestions, current_allocation, target_allocation, total_adjustment}
+	current := map[string]float64{}
+	target := map[string]float64{}
+	totalAdj := 0.0
+	for _, s := range suggestions {
+		current[s.Category] = math.Round(s.CurrentPct*100) / 100
+		target[s.Category] = s.TargetPct
+		totalAdj += math.Abs(s.AmountSuggest)
+	}
+	if suggestions == nil {
+		suggestions = []rebalance.RebalanceSuggestion{}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"suggestions":        suggestions,
+		"current_allocation": current,
+		"target_allocation":  target,
+		"total_adjustment":   math.Round(totalAdj/2*100) / 100,
+	})
 }
 
 func (h *Handler) GetTargetAllocation(c *gin.Context) {

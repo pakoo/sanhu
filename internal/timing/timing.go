@@ -1,13 +1,15 @@
 package timing
 
 import (
+	"fmt"
+	"math"
+
 	"github.com/jmoiron/sqlx"
-	"github.com/pakoo/sanhu/internal/fetcher"
 	"github.com/pakoo/sanhu/internal/scoring"
 )
 
-// Signal 三层择时信号的综合结果
-type Signal string
+// Signal 兼容旧调用方的类型别名
+type Signal = string
 
 const (
 	SignalFavorable   Signal = "favorable"
@@ -15,124 +17,123 @@ const (
 	SignalUnfavorable Signal = "unfavorable"
 )
 
-// LayerSignal 单层信号
-type LayerSignal struct {
-	Layer  string `json:"layer"`   // market / quality / technical
-	Signal Signal `json:"signal"`  // favorable / neutral / unfavorable
-	Reason string `json:"reason"`
-	Score  int    `json:"score"`   // -1 / 0 / 1
+// MarketSignal / QualitySignal / PriceSignal 对齐 Python 三层信号明细
+type MarketSignal struct {
+	Level string   `json:"level"`
+	PEPct *float64 `json:"pe_pct"`
+}
+type QualitySignal struct {
+	Level      string   `json:"level"`
+	TotalScore *float64 `json:"total_score"`
+}
+type PriceSignal struct {
+	Level        string   `json:"level"`
+	DeviationPct *float64 `json:"deviation_pct"`
 }
 
-// TimingResult 完整择时结果
+// TimingResult 对齐 Python get_timing_signal 输出
 type TimingResult struct {
-	Signal   Signal        `json:"signal"`
-	Layers   []LayerSignal `json:"layers"`
-	Summary  string        `json:"summary"`
+	Code           string        `json:"code"`
+	Level          string        `json:"level"`
+	CompositeScore int           `json:"composite_score"`
+	Fragments      []string      `json:"fragments"`
+	MarketSignal   MarketSignal  `json:"market_signal"`
+	QualitySignal  QualitySignal `json:"quality_signal"`
+	PriceSignal    PriceSignal   `json:"price_signal"`
+	Signal         Signal        `json:"-"` // 兼容字段（= Level）
 }
 
-// GetTimingSignal 三层综合择时：市场估值 + 基金质量 + 技术面偏离
+// GetTimingSignal 三层综合择时：市场估值(HS300 PE) + 基金质量(评分) + 技术面(20日均线)
 func GetTimingSignal(db *sqlx.DB, code string) (*TimingResult, error) {
-	layers := make([]LayerSignal, 0, 3)
-	total := 0
+	levelScore := map[string]int{"favorable": 1, "neutral": 0, "unfavorable": -1}
 
-	// ── 层 1：市场估值（HS300 PE 百分位）──────────────────────────────────────
-	pePct, err := fetcher.CalcPEPercentile(db, "000300", 5)
-	marketLayer := LayerSignal{Layer: "market"}
-	if err != nil || pePct == 0 {
-		marketLayer.Signal = SignalNeutral
-		marketLayer.Reason = "估值数据不足，视为合理"
-		marketLayer.Score = 0
-	} else {
+	// ── 层 1：市场估值（HS300 PE 百分位，近10年）─────────────────────────────
+	marketLevel := "neutral"
+	marketNote := "市场估值数据暂缺"
+	var pePct *float64
+	if pct, ok := hs300Percentile(db); ok {
+		pePct = &pct
 		switch {
-		case pePct < 30:
-			marketLayer.Signal = SignalFavorable
-			marketLayer.Reason = "HS300 PE 百分位 < 30%，市场低估"
-			marketLayer.Score = 1
-		case pePct > 70:
-			marketLayer.Signal = SignalUnfavorable
-			marketLayer.Reason = "HS300 PE 百分位 > 70%，市场高估"
-			marketLayer.Score = -1
+		case pct < 30:
+			marketLevel, marketNote = "favorable", fmt.Sprintf("HS300 PE %.0f%% 低估区间", pct)
+		case pct > 70:
+			marketLevel, marketNote = "unfavorable", fmt.Sprintf("HS300 PE %.0f%% 高估区间", pct)
 		default:
-			marketLayer.Signal = SignalNeutral
-			marketLayer.Reason = "HS300 PE 百分位合理区间"
-			marketLayer.Score = 0
+			marketLevel, marketNote = "neutral", fmt.Sprintf("HS300 PE %.0f%% 合理区间", pct)
 		}
 	}
-	layers = append(layers, marketLayer)
-	total += marketLayer.Score
 
 	// ── 层 2：基金质量（评分）────────────────────────────────────────────────
-	qualityLayer := LayerSignal{Layer: "quality"}
-	s, err := scoring.GetFundScore(db, code)
-	if err != nil || s == nil {
-		qualityLayer.Signal = SignalNeutral
-		qualityLayer.Reason = "评分数据不足"
-		qualityLayer.Score = 0
-	} else {
+	qualityLevel := "neutral"
+	qualityNote := "暂无评分数据"
+	var totalScore *float64
+	if s, err := scoring.GetFundScore(db, code); err == nil && s != nil {
+		ts := s.TotalScore
+		totalScore = &ts
 		switch {
-		case s.TotalScore >= 75:
-			qualityLayer.Signal = SignalFavorable
-			qualityLayer.Reason = "基金综合评分 ≥ 75，质量较优"
-			qualityLayer.Score = 1
-		case s.TotalScore < 50:
-			qualityLayer.Signal = SignalUnfavorable
-			qualityLayer.Reason = "基金综合评分 < 50，质量偏弱"
-			qualityLayer.Score = -1
+		case ts >= 75:
+			qualityLevel, qualityNote = "favorable", fmt.Sprintf("综合分 %.0f 较高", ts)
+		case ts < 50:
+			qualityLevel, qualityNote = "unfavorable", fmt.Sprintf("综合分 %.0f 偏低", ts)
 		default:
-			qualityLayer.Signal = SignalNeutral
-			qualityLayer.Reason = "基金综合评分中等"
-			qualityLayer.Score = 0
+			qualityLevel, qualityNote = "neutral", fmt.Sprintf("综合分 %.0f", ts)
 		}
 	}
-	layers = append(layers, qualityLayer)
-	total += qualityLayer.Score
 
 	// ── 层 3：技术面（净值 vs 20 日均线偏离）─────────────────────────────────
-	techLayer := LayerSignal{Layer: "technical"}
-	deviation, ok := navDeviation(db, code, 20)
-	if !ok {
-		techLayer.Signal = SignalNeutral
-		techLayer.Reason = "净值数据不足"
-		techLayer.Score = 0
-	} else {
+	priceLevel := "neutral"
+	priceNote := "历史净值数据不足"
+	var deviationPct *float64
+	if dev, ok := navDeviation(db, code, 20); ok {
+		d := dev * 100
+		deviationPct = &d
 		switch {
-		case deviation < -0.05:
-			techLayer.Signal = SignalFavorable
-			techLayer.Reason = "净值低于 20 日均线 5% 以上，存在超跌机会"
-			techLayer.Score = 1
-		case deviation > 0.05:
-			techLayer.Signal = SignalUnfavorable
-			techLayer.Reason = "净值高于 20 日均线 5% 以上，短期偏高"
-			techLayer.Score = -1
+		case dev <= -0.05:
+			priceLevel, priceNote = "favorable", fmt.Sprintf("现价低于20日均线 %.1f%%", math.Abs(dev)*100)
+		case dev >= 0.05:
+			priceLevel, priceNote = "unfavorable", fmt.Sprintf("现价高于20日均线 %.1f%%", dev*100)
 		default:
-			techLayer.Signal = SignalNeutral
-			techLayer.Reason = "净值在均线附近，技术面中性"
-			techLayer.Score = 0
+			priceLevel, priceNote = "neutral", fmt.Sprintf("现价接近20日均线 (%+.1f%%)", dev*100)
 		}
 	}
-	layers = append(layers, techLayer)
-	total += techLayer.Score
 
-	// ── 合成 ──────────────────────────────────────────────────────────────────
-	var overallSignal Signal
-	var summary string
-	switch {
-	case total >= 2:
-		overallSignal = SignalFavorable
-		summary = "三层信号多数偏多，综合建议积极关注"
-	case total <= -2:
-		overallSignal = SignalUnfavorable
-		summary = "三层信号多数偏空，建议谨慎或暂缓"
-	default:
-		overallSignal = SignalNeutral
-		summary = "信号分歧，建议中性观望"
+	composite := levelScore[marketLevel] + levelScore[qualityLevel] + levelScore[priceLevel]
+	finalLevel := "neutral"
+	if composite >= 2 {
+		finalLevel = "favorable"
+	} else if composite <= -2 {
+		finalLevel = "unfavorable"
 	}
 
 	return &TimingResult{
-		Signal:  overallSignal,
-		Layers:  layers,
-		Summary: summary,
+		Code:           code,
+		Level:          finalLevel,
+		CompositeScore: composite,
+		Fragments:      []string{marketNote, qualityNote, priceNote},
+		MarketSignal:   MarketSignal{Level: marketLevel, PEPct: pePct},
+		QualitySignal:  QualitySignal{Level: qualityLevel, TotalScore: totalScore},
+		PriceSignal:    PriceSignal{Level: priceLevel, DeviationPct: deviationPct},
+		Signal:         finalLevel,
 	}, nil
+}
+
+// hs300Percentile 近10年 HS300 PE 百分位
+func hs300Percentile(db *sqlx.DB) (float64, bool) {
+	var pes []float64
+	if err := db.Select(&pes, `
+		SELECT pe FROM index_pe_history
+		WHERE index_code='hs300' AND pe IS NOT NULL
+		ORDER BY date DESC LIMIT ?`, 10*252); err != nil || len(pes) == 0 {
+		return 0, false
+	}
+	cur := pes[0]
+	below := 0
+	for _, v := range pes {
+		if v <= cur {
+			below++
+		}
+	}
+	return math.Round(float64(below)/float64(len(pes))*100*10) / 10, true
 }
 
 // ─── 内部辅助 ──────────────────────────────────────────────────────────────────
@@ -146,7 +147,7 @@ func navDeviation(db *sqlx.DB, code string, days int) (float64, bool) {
 	if err := db.Select(&rows, `
 		SELECT nav FROM nav_history
 		WHERE code=? AND nav>0
-		ORDER BY date DESC LIMIT ?`, code, days); err != nil || len(rows) < days/2 {
+		ORDER BY date DESC LIMIT ?`, code, days); err != nil || len(rows) < days {
 		return 0, false
 	}
 	if len(rows) == 0 {

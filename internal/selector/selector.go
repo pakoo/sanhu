@@ -47,9 +47,9 @@ func DiagnosePortfolioGaps(db *sqlx.DB) ([]Gap, error) {
 		return nil, err
 	}
 
-	gaps := make([]Gap, 0, len(breakdown))
-	for _, item := range breakdown {
-		deficit := 10 - item.Weight
+	gaps := make([]Gap, 0, len(breakdown.Industries))
+	for _, item := range breakdown.Industries {
+		deficit := 10 - item.TotalWeight
 		if deficit <= 0 {
 			continue
 		}

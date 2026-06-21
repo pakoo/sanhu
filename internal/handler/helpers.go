@@ -150,9 +150,10 @@ func loadPortfolioHoldings(db *sqlx.DB) ([]portfolioHolding, float64, error) {
 		return nil, 0, err
 	}
 
-	nameExpr := "''"
+	// holdings 表无 name 列时从 funds 取（与 Python get_portfolio_summary 的 JOIN funds 对齐）
+	nameExpr := "COALESCE((SELECT name FROM funds WHERE funds.code=holdings.code), '')"
 	if hasColumn(cols, "name") {
-		nameExpr = "COALESCE(name, '')"
+		nameExpr = "COALESCE(NULLIF(name,''), (SELECT name FROM funds WHERE funds.code=holdings.code), '')"
 	}
 	sharesExpr := "0"
 	if hasColumn(cols, "shares") {
@@ -195,10 +196,13 @@ func loadPortfolioHoldings(db *sqlx.DB) ([]portfolioHolding, float64, error) {
 		if value <= 0 && row.Shares > 0 {
 			value = latestNavValue(db, row.Code) * row.Shares
 		}
-		if value <= 0 && row.CostAmount > 0 {
+		// 与 Python 基准对齐：仅持有中(shares>0)且净值缺失时才用成本兜底；
+		// 清仓持仓(shares=0)当前市值为 0，保留(value=0)——Python 同样保留，
+		// 用于回撤/波动/亏损告警等明细（权重为 0，不影响组合占比）。
+		if value <= 0 && row.Shares > 0 && row.CostAmount > 0 {
 			value = row.CostAmount
 		}
-		if row.Code == "" || value <= 0 {
+		if row.Code == "" {
 			continue
 		}
 		item := portfolioHolding{
@@ -221,10 +225,16 @@ func loadPortfolioHoldings(db *sqlx.DB) ([]portfolioHolding, float64, error) {
 func toRiskInputs(items []portfolioHolding) []risk.HoldingInput {
 	out := make([]risk.HoldingInput, 0, len(items))
 	for _, item := range items {
+		profitRate := 0.0
+		if item.CostAmount > 0 {
+			profitRate = (item.Value - item.CostAmount) / item.CostAmount * 100
+		}
 		out = append(out, risk.HoldingInput{
-			Code:     item.Code,
-			Value:    item.Value,
-			Category: item.Category,
+			Code:       item.Code,
+			Name:       item.Name,
+			Value:      item.Value,
+			Category:   item.Category,
+			ProfitRate: profitRate,
 		})
 	}
 	return out

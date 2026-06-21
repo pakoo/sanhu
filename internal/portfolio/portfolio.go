@@ -40,8 +40,9 @@ type PortfolioSummary struct {
 	TotalProfit float64            `json:"total_profit"`      // was total_pnl_amount
 	TotalProfitRate float64        `json:"total_profit_rate"` // was total_pnl_pct
 	DailyProfit float64            `json:"daily_profit"`      // 今日浮盈（暂填 0）
-	Holdings    []Holding          `json:"holdings"`
-	Allocation  map[string]float64 `json:"allocation"` // {category: pct, ...}
+	Holdings         []Holding          `json:"holdings"`
+	Allocation       map[string]float64 `json:"allocation"`        // {category: pct, ...}
+	AllocationAmount map[string]float64 `json:"allocation_amount"` // {category: 金额, ...}
 }
 
 type NavPoint struct {
@@ -82,9 +83,11 @@ type HoldingDetail struct {
 	DailyProfit   float64       `json:"daily_profit"`
 	NavHistory    []NavPoint    `json:"nav_history"`
 	Transactions  []Transaction `json:"transactions"`
-	TopIndustries []string      `json:"top_industries"`
-	PeerRank1y    float64       `json:"peer_rank_1y"`  // 百分位 0-100，越低越好
-	PeerRank      float64       `json:"peer_rank"`     // alias for peer_rank_1y
+	TopIndustries         []string `json:"top_industries"`
+	PeerRank1y            float64  `json:"peer_rank_1y"` // 百分位 0-100，越低越好
+	PeerRank              float64  `json:"peer_rank"`    // alias for peer_rank_1y
+	BuyDate               *string  `json:"buy_date"`
+	IndustryConcentration float64  `json:"industry_concentration"` // 前3大行业权重和
 }
 
 // ─── 公开接口 ──────────────────────────────────────────────────────────────────
@@ -100,20 +103,24 @@ func GetPortfolioSummary(db *sqlx.DB) (*PortfolioSummary, error) {
 	}
 
 	var rows []rawHolding
+	// 与 Python 基准对齐：INNER JOIN funds、不过滤 shares=0（保留清仓持仓）、
+	// 按当前市值(shares×最新净值)降序排序。
 	if err := db.Select(&rows, `
 		SELECT h.code, COALESCE(f.name,'') AS name,
 		       COALESCE(f.category,'mixed') AS category,
 		       h.shares, h.cost_amount
 		FROM holdings h
-		LEFT JOIN funds f ON f.code=h.code
-		WHERE h.shares>0
-		ORDER BY h.cost_amount DESC
+		JOIN funds f ON f.code=h.code
+		ORDER BY h.shares * COALESCE(
+			(SELECT nav FROM nav_history WHERE code=h.code ORDER BY date DESC LIMIT 1), 1
+		) DESC
 	`); err != nil {
 		return nil, fmt.Errorf("query holdings: %w", err)
 	}
 
 	summary := &PortfolioSummary{
-		Allocation: map[string]float64{},
+		Allocation:       map[string]float64{},
+		AllocationAmount: map[string]float64{},
 	}
 
 	catValueMap := map[string]float64{}
@@ -158,8 +165,9 @@ func GetPortfolioSummary(db *sqlx.DB) (*PortfolioSummary, error) {
 		summary.TotalProfitRate = summary.TotalProfit / summary.TotalCost * 100
 	}
 
-	// allocation as map[category]pct for frontend pie chart
+	// allocation as map[category]pct for frontend pie chart + 各类别金额
 	for cat, val := range catValueMap {
+		summary.AllocationAmount[cat] = math.Round(val*100) / 100
 		if summary.TotalValue > 0 {
 			summary.Allocation[cat] = math.Round(val/summary.TotalValue*10000) / 100
 		}
@@ -222,15 +230,28 @@ func GetHoldingDetail(db *sqlx.DB, code string) (*HoldingDetail, error) {
 
 	var industries []string
 	var rawIndustries []struct {
-		Industry string `db:"industry"`
+		Industry string  `db:"industry"`
+		Weight   float64 `db:"weight"`
 	}
 	_ = db.Select(&rawIndustries, `
-		SELECT industry FROM fund_industry
+		SELECT industry, COALESCE(weight,0) AS weight FROM fund_industry
 		WHERE code=?
 		ORDER BY report_date DESC, weight DESC
 		LIMIT 5`, code)
-	for _, ri := range rawIndustries {
+	concentration := 0.0
+	for i, ri := range rawIndustries {
 		industries = append(industries, ri.Industry)
+		if i < 3 {
+			concentration += ri.Weight
+		}
+	}
+	concentration = math.Round(concentration*100) / 100
+
+	var buyDate *string
+	var bd sql.NullString
+	if err := db.Get(&bd, `SELECT buy_date FROM holdings WHERE code=?`, code); err == nil && bd.Valid && bd.String != "" {
+		s := bd.String
+		buyDate = &s
 	}
 
 	var peerRank float64
@@ -263,9 +284,11 @@ func GetHoldingDetail(db *sqlx.DB, code string) (*HoldingDetail, error) {
 		DailyProfit:   0,
 		NavHistory:    navHistory,
 		Transactions:  txs,
-		TopIndustries: industries,
-		PeerRank1y:    peerRank,
-		PeerRank:      peerRank,
+		TopIndustries:         industries,
+		PeerRank1y:            peerRank,
+		PeerRank:              peerRank,
+		BuyDate:               buyDate,
+		IndustryConcentration: concentration,
 	}, nil
 }
 

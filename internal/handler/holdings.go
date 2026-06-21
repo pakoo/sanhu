@@ -102,7 +102,16 @@ func (h *Handler) GetFundIndustry(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, rows)
+	// 与 Python 基准 + 前端契约对齐：返回 {code, industries:[{industry,weight}], report_date}
+	industries := make([]gin.H, 0, len(rows))
+	reportDate := ""
+	for _, r := range rows {
+		industries = append(industries, gin.H{"industry": r.Industry, "weight": r.Weight})
+		if r.ReportDate > reportDate {
+			reportDate = r.ReportDate
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{"code": code, "industries": industries, "report_date": reportDate})
 }
 
 func (h *Handler) GetHoldingsOverlap(c *gin.Context) {

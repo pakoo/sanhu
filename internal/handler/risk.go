@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"math"
 	"net/http"
+	"sort"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pakoo/sanhu/internal/risk"
@@ -22,40 +24,94 @@ func (h *Handler) GetRiskAnalysis(c *gin.Context) {
 }
 
 func (h *Handler) GetCorrelation(c *gin.Context) {
-	codes := allFundCodes(h.DB)
+	// 与 Python 基准对齐：仅持仓基金；每只取最近 252 行 daily_return 列；
+	// 全局 dropna（保留所有基金都有数据的日期）后计算 Pearson；矩阵四舍五入 3 位。
+	var codes []string
+	_ = h.DB.Select(&codes, `SELECT code FROM holdings`)
 	if len(codes) == 0 {
-		c.JSON(http.StatusOK, gin.H{"codes": []string{}, "correlation_matrix": [][]float64{}})
+		c.JSON(http.StatusOK, gin.H{"codes": []string{}, "names": []string{}, "matrix": [][]float64{}, "correlation_matrix": [][]float64{}})
 		return
 	}
 
 	series := make(map[string]map[string]float64, len(codes))
+	nameOf := make(map[string]string, len(codes))
+	withData := make([]string, 0, len(codes))
 	for _, code := range codes {
-		data, err := dailyReturnSeries(h.DB, code, 90)
-		if err != nil {
+		type row struct {
+			Date string  `db:"date"`
+			Ret  float64 `db:"ret"`
+			Name string  `db:"name"`
+		}
+		var rows []row
+		if err := h.DB.Select(&rows, `
+			SELECT nh.date, nh.daily_return AS ret, f.name
+			FROM nav_history nh JOIN funds f ON nh.code=f.code
+			WHERE nh.code=? AND nh.daily_return IS NOT NULL
+			ORDER BY nh.date DESC LIMIT 252`, code); err != nil {
 			fail(c, http.StatusInternalServerError, err.Error())
 			return
 		}
-		series[code] = data
+		if len(rows) == 0 {
+			continue
+		}
+		nameOf[code] = rows[0].Name
+		m := make(map[string]float64, len(rows))
+		for _, r := range rows {
+			m[r.Date] = r.Ret
+		}
+		series[code] = m
+		withData = append(withData, code)
 	}
 
-	matrix := make([][]float64, len(codes))
-	for i, codeI := range codes {
-		matrix[i] = make([]float64, len(codes))
-		for j, codeJ := range codes {
+	names := make([]string, len(withData))
+	for i, code := range withData {
+		names[i] = nameOf[code]
+	}
+
+	if len(withData) < 2 {
+		c.JSON(http.StatusOK, gin.H{"codes": withData, "names": names, "matrix": [][]float64{}, "correlation_matrix": [][]float64{}})
+		return
+	}
+
+	// 全局 dropna：仅保留所有基金都有数据的日期
+	counter := map[string]int{}
+	for _, code := range withData {
+		for d := range series[code] {
+			counter[d]++
+		}
+	}
+	dates := make([]string, 0)
+	for d, cnt := range counter {
+		if cnt == len(withData) {
+			dates = append(dates, d)
+		}
+	}
+	if len(dates) < 10 {
+		c.JSON(http.StatusOK, gin.H{"codes": withData, "names": names, "matrix": [][]float64{}, "correlation_matrix": [][]float64{}})
+		return
+	}
+	sort.Strings(dates)
+
+	vecs := make(map[string][]float64, len(withData))
+	for _, code := range withData {
+		v := make([]float64, len(dates))
+		for i, d := range dates {
+			v[i] = series[code][d]
+		}
+		vecs[code] = v
+	}
+
+	matrix := make([][]float64, len(withData))
+	for i, ci := range withData {
+		matrix[i] = make([]float64, len(withData))
+		for j, cj := range withData {
 			if i == j {
 				matrix[i][j] = 1
 				continue
 			}
-			var xs, ys []float64
-			for date, x := range series[codeI] {
-				if y, ok := series[codeJ][date]; ok {
-					xs = append(xs, x)
-					ys = append(ys, y)
-				}
-			}
-			matrix[i][j] = pearson(xs, ys)
+			matrix[i][j] = math.Round(pearson(vecs[ci], vecs[cj])*1000) / 1000
 		}
 	}
 
-	c.JSON(http.StatusOK, gin.H{"codes": codes, "correlation_matrix": matrix})
+	c.JSON(http.StatusOK, gin.H{"codes": withData, "names": names, "matrix": matrix, "correlation_matrix": matrix})
 }

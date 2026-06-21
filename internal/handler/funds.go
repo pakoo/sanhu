@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	sanhugo "github.com/pakoo/sanhu"
 	"github.com/pakoo/sanhu/internal/fetcher"
-	"github.com/pakoo/sanhu/internal/portfolio"
 	"github.com/pakoo/sanhu/internal/scoring"
 	"github.com/pakoo/sanhu/internal/selector"
 )
@@ -45,12 +44,21 @@ func (h *Handler) GetRefreshStatus(c *gin.Context) {
 
 func (h *Handler) GetFundNav(c *gin.Context) {
 	days := parseIntDefault(c.DefaultQuery("days", "365"), 365)
-	points, err := portfolio.GetNavHistory(h.DB, c.Param("code"), days)
-	if err != nil {
+	// 与 Python get_nav_history 对齐：裸数组 [{date,nav,acc_nav,daily_return}]，最近 days 行降序。
+	type navRow struct {
+		Date        string   `db:"date" json:"date"`
+		Nav         float64  `db:"nav" json:"nav"`
+		AccNav      *float64 `db:"acc_nav" json:"acc_nav"`
+		DailyReturn *float64 `db:"daily_return" json:"daily_return"`
+	}
+	rows := []navRow{}
+	if err := h.DB.Select(&rows, `
+		SELECT date, nav, acc_nav, daily_return FROM nav_history
+		WHERE code=? ORDER BY date DESC LIMIT ?`, c.Param("code"), days); err != nil {
 		fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"nav_history": points})
+	c.JSON(http.StatusOK, rows)
 }
 
 func (h *Handler) GetFundRealtime(c *gin.Context) {
