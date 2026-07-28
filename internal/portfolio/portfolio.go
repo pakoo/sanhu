@@ -21,6 +21,9 @@ type Holding struct {
 	CurrentValue float64   `json:"current_value"`
 	Profit       float64   `json:"profit"`       // was pnl_amount
 	ProfitRate   float64   `json:"profit_rate"`  // was pnl_pct
+	// NavStale=true 表示这只基金没抓到净值，市值用的是用户录入时填的金额（或成本），
+	// 收益/收益率不可信因此置 0，前端据此显示「净值未更新」而不是 0.00%
+	NavStale bool `json:"nav_stale"`
 	DailyProfit  float64   `json:"daily_profit"` // 今日浮盈（暂填 0）
 	Return7d     float64   `json:"return_7d"`
 	Return1m     float64   `json:"return_1m"`
@@ -95,11 +98,12 @@ type HoldingDetail struct {
 // GetPortfolioSummary 汇总所有持仓，含分类配置比例和净值曲线
 func GetPortfolioSummary(db *sqlx.DB) (*PortfolioSummary, error) {
 	type rawHolding struct {
-		Code       string  `db:"code"`
-		Name       string  `db:"name"`
-		Category   string  `db:"category"`
-		Shares     float64 `db:"shares"`
-		CostAmount float64 `db:"cost_amount"`
+		Code         string   `db:"code"`
+		Name         string   `db:"name"`
+		Category     string   `db:"category"`
+		Shares       float64  `db:"shares"`
+		CostAmount   float64  `db:"cost_amount"`
+		EnteredValue *float64 `db:"entered_value"`
 	}
 
 	var rows []rawHolding
@@ -108,7 +112,7 @@ func GetPortfolioSummary(db *sqlx.DB) (*PortfolioSummary, error) {
 	if err := db.Select(&rows, `
 		SELECT h.code, COALESCE(f.name,'') AS name,
 		       COALESCE(f.category,'mixed') AS category,
-		       h.shares, h.cost_amount
+		       h.shares, h.cost_amount, h.entered_value
 		FROM holdings h
 		JOIN funds f ON f.code=h.code
 		ORDER BY h.shares * COALESCE(
@@ -128,12 +132,31 @@ func GetPortfolioSummary(db *sqlx.DB) (*PortfolioSummary, error) {
 	catValueMap := map[string]float64{}
 
 	for _, r := range rows {
-		nav, err := latestNav(db, r.Code)
-		if err != nil || nav == 0 {
-			nav = r.CostAmount / max(r.Shares, 0.0001)
-		}
-		cur := nav * r.Shares
 		cost := r.CostAmount
+		nav, err := latestNav(db, r.Code)
+
+		// 净值可用且份额算得出 → 正常口径：市值 = 净值 × 份额
+		// 否则 → 净值未更新：回落到用户录入时填的持有金额，其次成本；收益率不计算。
+		// （原来这里用 成本/max(份额,0.0001) 反推净值，份额为 0 时会算出 4.7 亿这种数，
+		//   市值又变成 0 —— 用户填的钱直接消失。）
+		var cur float64
+		navStale := false
+		if err == nil && nav > 0 && r.Shares > 0 {
+			cur = nav * r.Shares
+		} else {
+			navStale = true
+			nav = 0
+			switch {
+			case r.EnteredValue != nil && *r.EnteredValue > 0:
+				cur = *r.EnteredValue
+			default:
+				cur = cost
+			}
+		}
+
+		// 收益仍然算：净值缺失时市值用的是用户录入的金额，
+		// 「市值 − 成本」正好等于他自己填的那笔收益，回显他的数比抹成 0 更诚实，
+		// 数据是否新鲜由 NavStale 标注，前端挂「净值未更新」提示。
 		profit := cur - cost
 		profitRate := 0.0
 		if cost > 0 {
@@ -150,6 +173,7 @@ func GetPortfolioSummary(db *sqlx.DB) (*PortfolioSummary, error) {
 			CurrentValue: cur,
 			Profit:       profit,
 			ProfitRate:   profitRate,
+			NavStale:     navStale,
 			DailyProfit:  0,
 			Return7d:     periodReturn(db, r.Code, 7),
 			Return1m:     periodReturn(db, r.Code, 30),

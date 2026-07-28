@@ -20,6 +20,61 @@ func (h *Handler) SearchFunds(c *gin.Context) {
 	c.JSON(http.StatusOK, results)
 }
 
+// LookupFund 按代码确认一只基金是否存在，供录入时即时校验。
+//
+// 库里有档案就直接返回；没有就现抓一次东财（约 1 秒），抓到即入库。
+// 录入流程靠它做到「填完代码自动带出名称」，并把填错的代码挡在暂存列表之外——
+// 否则会录进一个查无此基金的空壳，最终在持仓列表里显示成一行代码、市值 0。
+func (h *Handler) LookupFund(c *gin.Context) {
+	code := c.Param("code")
+
+	type fundRow struct {
+		Code     string  `db:"code"`
+		Name     string  `db:"name"`
+		FundType string  `db:"fund_type"`
+		Category string  `db:"category"`
+		Nav      float64 `db:"nav"`
+		NavDate  string  `db:"nav_date"`
+	}
+
+	query := `
+		SELECT f.code,
+		       COALESCE(f.name,'')      AS name,
+		       COALESCE(f.fund_type,'') AS fund_type,
+		       COALESCE(f.category,'')  AS category,
+		       COALESCE((SELECT nav  FROM nav_history WHERE code=f.code ORDER BY date DESC LIMIT 1), 0)  AS nav,
+		       COALESCE((SELECT date FROM nav_history WHERE code=f.code ORDER BY date DESC LIMIT 1), '') AS nav_date
+		FROM funds f WHERE f.code=?`
+
+	var row fundRow
+	err := h.DB.Get(&row, query, code)
+
+	// 库里没有、或只有个占位名（早期录入只写了 code+name 就落库）→ 现抓
+	if err != nil || row.FundType == "" {
+		if ferr := fetcher.FetchFundInfo(h.DB, code); ferr != nil {
+			fail(c, http.StatusNotFound, "没有查到这只基金，请检查代码是否正确")
+			return
+		}
+		if err := h.DB.Get(&row, query, code); err != nil {
+			fail(c, http.StatusNotFound, "没有查到这只基金，请检查代码是否正确")
+			return
+		}
+	}
+	if row.Name == "" || row.Name == code {
+		fail(c, http.StatusNotFound, "没有查到这只基金，请检查代码是否正确")
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"code":      row.Code,
+		"name":      row.Name,
+		"fund_type": row.FundType,
+		"category":  row.Category,
+		"nav":       row.Nav,
+		"nav_date":  row.NavDate,
+	})
+}
+
 func (h *Handler) RefreshFunds(c *gin.Context) {
 	if !startTask(&navRefreshTask) {
 		c.JSON(http.StatusOK, gin.H{"status": "running"})

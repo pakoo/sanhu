@@ -238,6 +238,16 @@ async function loadDashboard() {
         ]);
         // 兜底：后端空库可能返回 holdings=null，下面所有渲染都按数组用
         if (portfolioData && !Array.isArray(portfolioData.holdings)) portfolioData.holdings = [];
+
+        // 一条持仓都没有 → 空态引导接管，不渲染空图表
+        const isEmpty = portfolioData.holdings.length === 0;
+        document.getElementById('emptyStateGuide').style.display = isEmpty ? 'block' : 'none';
+        document.getElementById('dashboardContent').style.display = isEmpty ? 'none' : 'block';
+        if (isEmpty) {
+            renderHoldingsTable(portfolioData);
+            return;
+        }
+
         renderSummaryCards(portfolioData);
         renderAllocationChart(portfolioData);
         renderReturnChart(portfolioData);
@@ -359,6 +369,15 @@ function renderHoldingsTable(data) {
         scoresData.forEach(s => { scoreMap[s.code] = s; });
     }
 
+    if (!data.holdings.length) {
+        const cols = (tbody.closest('table') || {}).querySelectorAll
+            ? tbody.closest('table').querySelectorAll('thead th').length : 12;
+        tbody.innerHTML = `<tr><td colspan="${cols}" style="text-align:center;padding:28px 12px;color:var(--text-secondary);font-size:13px;">
+            还没有持仓 —— 点右上角「更新持仓」按代码逐只录入
+        </td></tr>`;
+        return;
+    }
+
     tbody.innerHTML = data.holdings.map(h => {
         const profitClass = h.profit >= 0 ? 'text-profit' : 'text-loss';
         const dailyClass = h.daily_profit >= 0 ? 'text-profit' : 'text-loss';
@@ -367,6 +386,11 @@ function renderHoldingsTable(data) {
 
         const fmtPct = v => v == null ? '--'
             : `<span class="${v >= 0 ? 'text-profit' : 'text-loss'}">${v >= 0 ? '+' : ''}${v}%</span>`;
+
+        // 没抓到净值：市值/收益显示的是用户录入时自己填的数，不是市价算出来的
+        const staleTag = `<span title="没有获取到这只基金的净值，市值与收益显示的是你录入时填写的数字"
+            style="display:inline-block;margin-left:6px;padding:1px 6px;border-radius:4px;font-size:11px;
+                   background:#fef3c7;color:#92400e;border:1px solid #fde68a;white-space:nowrap;">净值未更新</span>`;
 
         const scoreInfo = scoreMap[h.code];
         const scoreCell = scoreInfo
@@ -388,10 +412,10 @@ function renderHoldingsTable(data) {
                 ${industryChips ? `<div class="industry-chip-row">${industryChips}</div>` : ''}
             </td>
             <td><span class="type-badge ${h.category}">${categoryNames[h.category] || h.category}</span></td>
-            <td>${formatMoney(h.current_value)}</td>
+            <td>${formatMoney(h.current_value)}${h.nav_stale ? staleTag : ''}</td>
             <td class="${profitClass}">${sign}${formatMoney(h.profit)}</td>
-            <td class="${profitClass}">${sign}${h.profit_rate}%</td>
-            <td class="${dailyClass}">${dailySign}${formatMoney(h.daily_profit)}</td>
+            <td class="${profitClass}">${sign}${(h.profit_rate ?? 0).toFixed(2)}%</td>
+            <td class="${dailyClass}">${h.nav_stale ? '—' : dailySign + formatMoney(h.daily_profit)}</td>
             <td>${fmtPct(h.ret_7d)}</td>
             <td>${fmtPct(h.ret_1m)}</td>
             <td>${fmtPct(h.ret_3m)}</td>
@@ -970,7 +994,7 @@ async function showFundDetail(code) {
                     <div class="metric-label">持有收益</div>
                 </div>
                 <div class="metric-item">
-                    <div class="metric-value ${profitClass}">${sign}${detail.profit_rate}%</div>
+                    <div class="metric-value ${profitClass}">${sign}${(detail.profit_rate ?? 0).toFixed(2)}%</div>
                     <div class="metric-label">收益率</div>
                 </div>
                 <div class="metric-item">

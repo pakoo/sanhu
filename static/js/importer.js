@@ -65,13 +65,21 @@ async function manualAddRow() {
         errEl.textContent = `${code} 已在列表中`; errEl.style.display = 'block'; return;
     }
 
-    // 尝试查名称（失败不影响添加）
-    let name = '';
+    // 即时校验：查不到这只基金就不让它进列表。
+    // 以前这里查失败也照样添加，结果录进一个空壳基金——持仓列表里显示成一行代码、市值 0。
+    const addBtn = document.getElementById('manualAddBtn');
+    let name = '', lookup = null;
+    if (addBtn) { addBtn.disabled = true; addBtn.textContent = '查询中…'; }
     try {
-        const res = await API.searchFund(code);
-        const match = Array.isArray(res) ? res.find(f => f.code === code) : null;
-        if (match) name = match.name || '';
-    } catch (e) {}
+        lookup = await API.lookupFund(code);
+        name = lookup.name || '';
+    } catch (e) {
+        errEl.textContent = `没有查到基金 ${code}，请检查代码是否正确（需要联网获取基金信息）`;
+        errEl.style.display = 'block';
+        return;
+    } finally {
+        if (addBtn) { addBtn.disabled = false; addBtn.textContent = '＋ 添加'; }
+    }
 
     const profitStr = profitEl.value.trim();
     const profit = profitStr !== '' ? parseFloat(profitStr) : null;
@@ -85,6 +93,21 @@ async function manualAddRow() {
     codeEl.value = ''; amtEl.value = ''; profitEl.value = '';
     codeEl.focus();
     _renderManualStage();
+    _showLookupHint(lookup);
+}
+
+// 把刚查到的基金信息回显一行，让用户确认「代码没填错」
+function _showLookupHint(info) {
+    const el = document.getElementById('manualLookupHint');
+    if (!el) return;
+    if (!info) { el.style.display = 'none'; return; }
+    // 校验只查档案，净值在「确认更新」时才抓（Q2 = 添加时即时校验 + 提交时补净值），
+    // 所以这里不能说「市值将按你填的金额显示」——那是净值抓不到时才走的兜底
+    const navPart = info.nav > 0
+        ? ` · 最新净值 ${info.nav.toFixed(4)}${info.nav_date ? `（${info.nav_date}）` : ''}`
+        : ' · 净值将在提交时获取';
+    el.innerHTML = `✓ ${info.name}${info.fund_type ? ' · ' + info.fund_type : ''}${navPart}`;
+    el.style.display = 'block';
 }
 
 function updateManualCommitBtn() {

@@ -4,13 +4,22 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pakoo/sanhu/internal/fetcher"
 	"github.com/pakoo/sanhu/internal/importer"
 	"github.com/pakoo/sanhu/internal/portfolio"
 )
+
+// latestNavForImport 取一只基金的最新净值，没有则返回 0
+func (h *Handler) latestNavForImport(code string) float64 {
+	var nav float64
+	_ = h.DB.Get(&nav, `SELECT nav FROM nav_history WHERE code=? AND nav>0 ORDER BY date DESC LIMIT 1`, code)
+	return nav
+}
 
 func (h *Handler) ImportParse(c *gin.Context) {
 	file, err := c.FormFile("file")
@@ -145,21 +154,39 @@ func (h *Handler) ImportCommit(c *gin.Context) {
 			if costAmount == 0 && amount > 0 {
 				costAmount = amount - profit
 			}
-			if shares == 0 && amount > 0 {
-				var nav float64
-				_ = h.DB.Get(&nav, `SELECT nav FROM nav_history WHERE code=? AND nav>0 ORDER BY date DESC LIMIT 1`, code)
-				if nav > 0 {
-					shares = amount / nav
+			// 顺序要紧：先保证 funds 里有这只基金，再抓净值。
+			// nav_history 对 funds(code) 有外键，反过来做的话净值写入会被外键直接拒掉。
+			//
+			// 先试着抓真实档案：只塞 code+name 会得到一只没有 fund_type / category 的空壳基金，
+			// 分类、评分、风险、持仓穿透全部拿它没办法。
+			var known int
+			_ = h.DB.Get(&known, `SELECT COUNT(*) FROM funds WHERE code=? AND COALESCE(fund_type,'')!=''`, code)
+			if known == 0 {
+				if err := fetcher.FetchFundInfo(h.DB, code); err != nil {
+					log.Printf("[import] 抓取 %s 档案失败: %v", code, err)
 				}
-				// even if NAV is missing, record with shares=0 so holding appears in list
 			}
-
-			// ensure fund record exists (holdings has FK → funds)
 			fundName := fmt.Sprint(row["name"])
 			if fundName == "" {
 				fundName = code
 			}
 			_, _ = h.DB.Exec(`INSERT OR IGNORE INTO funds (code, name) VALUES (?,?)`, code, fundName)
+
+			if shares == 0 && amount > 0 {
+				nav := h.latestNavForImport(code)
+				if nav == 0 {
+					// 库里没有净值 —— 内置数据只有 11 只基金，用户录入的基金多半不在里面。
+					// 不补这一刀的话 shares 落 0，市值 = 净值 × 份额 = 0，用户填的钱就没了。
+					if err := fetcher.FetchNav(h.DB, code, 1095); err != nil {
+						log.Printf("[import] 抓取 %s 净值失败（将按「净值未更新」显示）: %v", code, err)
+					}
+					nav = h.latestNavForImport(code)
+				}
+				if nav > 0 {
+					shares = amount / nav
+				}
+				// 仍然抓不到时保留 shares=0，由 entered_value 兜底显示，见 migrations/002
+			}
 
 			var cnt int
 			if err := h.DB.Get(&cnt, `SELECT COUNT(*) FROM holdings WHERE code=?`, code); err != nil {
@@ -167,12 +194,20 @@ func (h *Handler) ImportCommit(c *gin.Context) {
 				return
 			}
 
+			// 存下用户填的持有金额原值：净值抓不到时用它显示市值，而不是显示 0
+			var enteredValue interface{}
+			if amount > 0 {
+				enteredValue = amount
+			}
+
 			var execErr error
 			if cnt > 0 {
-				_, execErr = h.DB.Exec(`UPDATE holdings SET shares=?, cost_amount=? WHERE code=?`, shares, costAmount, code)
+				_, execErr = h.DB.Exec(`UPDATE holdings SET shares=?, cost_amount=?, entered_value=? WHERE code=?`,
+					shares, costAmount, enteredValue, code)
 				updated++
 			} else {
-				_, execErr = h.DB.Exec(`INSERT INTO holdings (code, shares, cost_amount, buy_date) VALUES (?,?,?,date('now'))`, code, shares, costAmount)
+				_, execErr = h.DB.Exec(`INSERT INTO holdings (code, shares, cost_amount, entered_value, buy_date) VALUES (?,?,?,?,date('now'))`,
+					code, shares, costAmount, enteredValue)
 				inserted++
 			}
 			if execErr != nil {

@@ -14,6 +14,7 @@ func RegisterRoutes(r *gin.Engine, h *Handler) {
 	api.GET("/funds/refresh/status", h.GetRefreshStatus)
 	api.GET("/funds/scores", h.GetFundScores)
 	api.POST("/funds/scores/refresh", h.RefreshFundScores)
+	api.GET("/funds/:code/lookup", h.LookupFund)
 	api.GET("/funds/:code/nav", h.GetFundNav)
 	api.GET("/funds/:code/realtime", h.GetFundRealtime)
 	api.GET("/funds/:code/peers", h.GetFundPeers)

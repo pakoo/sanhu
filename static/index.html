@@ -100,6 +100,19 @@
     <div class="container">
         <!-- Tab 1: 总览 -->
         <div class="tab-content active" id="tab-dashboard">
+            <!-- 空态引导：一条持仓都没有时接管内容区，KPI 卡与图表都不渲染
+                 （四个 0 和一个灰甜甜圈只会让新用户以为程序坏了） -->
+            <div id="emptyStateGuide" class="card" style="display:none;text-align:center;padding:44px 24px;">
+                <div style="width:56px;height:56px;border-radius:14px;background:#eef0fd;border:2px dashed var(--primary);margin:0 auto 18px;"></div>
+                <div style="font-size:19px;font-weight:700;margin-bottom:8px;">先把你的持仓抄进来</div>
+                <div style="font-size:14px;color:var(--text-secondary);line-height:1.9;margin-bottom:22px;">
+                    打开支付宝 → 基金 → 持有页面，照着<strong>基金代码 / 持有金额 / 持有收益</strong>逐只填<br>
+                    录完就能看到收益、风险、调仓建议和持仓穿透
+                </div>
+                <button class="btn btn-primary" onclick="openImportModal()" style="font-size:15px;padding:11px 30px;">开始录入持仓</button>
+            </div>
+
+            <div id="dashboardContent">
             <div class="summary-cards" id="summaryCards"></div>
             <div id="aiContextBar" style="margin-bottom:16px;display:none;">
                 <button class="btn btn-primary" onclick="openAIContext()" style="gap:6px;">
@@ -116,6 +129,7 @@
                     <div class="card-title">各基金收益率</div>
                     <div class="chart-container" id="returnChart"></div>
                 </div>
+            </div>
             </div>
             <div class="card">
                 <!-- 子 Tab 标题栏 -->
@@ -870,9 +884,10 @@
                         style="flex:2;min-width:100px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
                     <input id="manualProfit" type="number" placeholder="持有收益（元，可选）"
                         style="flex:2;min-width:100px;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;">
-                    <button class="btn btn-primary" onclick="manualAddRow()" style="padding:7px 16px;font-size:13px;white-space:nowrap;">＋ 添加</button>
+                    <button class="btn btn-primary" id="manualAddBtn" onclick="manualAddRow()" style="padding:7px 16px;font-size:13px;white-space:nowrap;">＋ 添加</button>
                 </div>
                 <div id="manualAddError" style="color:#ef4444;font-size:12px;margin-bottom:8px;display:none;"></div>
+                <div id="manualLookupHint" style="color:var(--primary);font-size:12px;margin-bottom:10px;display:none;line-height:1.7;"></div>
                 <!-- 暂存列表 -->
                 <div id="manualStageWrap" style="display:none;">
                     <table id="manualStageTable" style="width:100%;border-collapse:collapse;font-size:13px;margin-bottom:12px;">

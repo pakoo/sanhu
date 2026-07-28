@@ -67,6 +67,14 @@ const API = {
     },
 
     // 设置
+    // 单独走 fetch：API.get 不区分 HTTP 状态码，4xx 也会当成正常结果返回，
+    // 而录入校验必须能区分「查到了」和「查不到」
+    async lookupFund(code) {
+        const resp = await fetch(`/api/funds/${code}/lookup`);
+        const body = await resp.json().catch(() => ({}));
+        if (!resp.ok || !body.code) throw new Error(body.msg || '查询失败');
+        return body;
+    },
     getSettings() { return this.get('/api/settings').then(r => r.data || {}); },
     patchSettings(data) {
         return fetch('/api/settings', {
