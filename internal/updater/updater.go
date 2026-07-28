@@ -19,6 +19,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -83,15 +84,49 @@ func CheckLatestRelease() (*ReleaseInfo, error) {
 	return info, nil
 }
 
-// NeedsUpdate 比较版本号（简单字符串比较，依赖 semver 格式 vX.Y.Z）
+// NeedsUpdate 判断是否有更新：latest 必须严格新于 current。
+//
+// 原来是 `latest != current` 字符串不等——任何差异都算"有更新"，
+// 一次回滚发布就会把所有用户推去装旧版本。改成按 semver 数字比较。
 func NeedsUpdate(current, latest string) bool {
-	if current == "dev" || current == "" {
+	if current == "dev" || current == "" || latest == "" {
 		return false // 开发版本不触发自动更新
 	}
-	// 去掉 v 前缀后直接比较
-	c := strings.TrimPrefix(current, "v")
-	l := strings.TrimPrefix(latest, "v")
-	return l != "" && l != c
+	return compareSemver(latest, current) > 0
+}
+
+// compareSemver 比较 vX.Y.Z：a>b 返回 1，a<b 返回 -1，相等返回 0。
+// 段数不等时短的补 0（v1.2 == v1.2.0）；非数字段落回退为字符串比较。
+func compareSemver(a, b string) int {
+	as := strings.Split(strings.TrimPrefix(strings.TrimSpace(a), "v"), ".")
+	bs := strings.Split(strings.TrimPrefix(strings.TrimSpace(b), "v"), ".")
+
+	n := len(as)
+	if len(bs) > n {
+		n = len(bs)
+	}
+	for i := 0; i < n; i++ {
+		av, aErr := segmentValue(as, i)
+		bv, bErr := segmentValue(bs, i)
+		if aErr != nil || bErr != nil {
+			// 含预发布标签等非纯数字段，退回字符串比较，避免误判成"有更新"
+			return strings.Compare(strings.TrimPrefix(a, "v"), strings.TrimPrefix(b, "v"))
+		}
+		if av != bv {
+			if av > bv {
+				return 1
+			}
+			return -1
+		}
+	}
+	return 0
+}
+
+func segmentValue(segments []string, i int) (int, error) {
+	if i >= len(segments) {
+		return 0, nil
+	}
+	return strconv.Atoi(segments[i])
 }
 
 // DownloadAndApply 下载新 exe 并执行替换。
@@ -106,11 +141,23 @@ func DownloadAndApply(downloadURL string, logs func(string)) error {
 	exeDir := filepath.Dir(exePath)
 
 	logs("下载新版本中...")
-	newExePath := exePath + ".new"
-	if err := downloadFile(downloadURL, newExePath); err != nil {
+	// 先下到临时文件（保留原始扩展名，解压时按后缀判断格式）
+	archivePath := exePath + ".download" + assetExt(downloadURL)
+	if err := downloadFile(downloadURL, archivePath); err != nil {
 		return fmt.Errorf("download: %w", err)
 	}
-	// 设置可执行权限
+	defer os.Remove(archivePath)
+
+	logs("解压中...")
+	newExePath := exePath + ".new"
+	if err := extractBinary(archivePath, newExePath); err != nil {
+		os.Remove(newExePath)
+		return fmt.Errorf("extract: %w", err)
+	}
+	if err := verifyExecutable(newExePath); err != nil {
+		os.Remove(newExePath)
+		return fmt.Errorf("下载的文件不是有效的可执行程序，已放弃更新: %w", err)
+	}
 	_ = os.Chmod(newExePath, 0755)
 	logs("下载完成，准备替换...")
 
@@ -118,6 +165,59 @@ func DownloadAndApply(downloadURL string, logs func(string)) error {
 		return applyWindows(exePath, newExePath, exeDir, logs)
 	}
 	return applyUnix(exePath, newExePath, logs)
+}
+
+// assetExt 从下载 URL 里取出扩展名（.tar.gz 作为整体保留）。
+func assetExt(url string) string {
+	name := url
+	if i := strings.LastIndex(name, "/"); i >= 0 {
+		name = name[i+1:]
+	}
+	if i := strings.Index(name, "?"); i >= 0 {
+		name = name[:i]
+	}
+	lower := strings.ToLower(name)
+	for _, ext := range []string{".tar.gz", ".tgz", ".zip", ".gz"} {
+		if strings.HasSuffix(lower, ext) {
+			return ext
+		}
+	}
+	return ""
+}
+
+// verifyExecutable 在覆盖当前程序之前做最后一道体检：
+// 文件非空、且带可执行文件的魔数。宁可放弃更新，也不能把用户装好的程序换成一团垃圾。
+func verifyExecutable(path string) error {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	if info.Size() < 1<<20 { // 正常构建产物 >10MB，1MB 以下必然不对
+		return fmt.Errorf("文件过小（%d 字节）", info.Size())
+	}
+
+	f, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	magic := make([]byte, 4)
+	if _, err := io.ReadFull(f, magic); err != nil {
+		return fmt.Errorf("读取文件头: %w", err)
+	}
+	switch {
+	case magic[0] == 0x7f && string(magic[1:4]) == "ELF": // Linux
+		return nil
+	case magic[0] == 'M' && magic[1] == 'Z': // Windows PE
+		return nil
+	// macOS Mach-O：32/64 位、大小端、universal binary
+	case string(magic) == "\xcf\xfa\xed\xfe" || string(magic) == "\xce\xfa\xed\xfe",
+		string(magic) == "\xfe\xed\xfa\xcf" || string(magic) == "\xfe\xed\xfa\xce",
+		string(magic) == "\xca\xfe\xba\xbe":
+		return nil
+	}
+	return fmt.Errorf("无法识别的文件格式（%x）", magic)
 }
 
 // ─── 内部辅助 ──────────────────────────────────────────────────────────────────
@@ -160,10 +260,24 @@ del /f /q "%%~f0"
 }
 
 func applyUnix(exePath, newExePath string, logs func(string)) error {
-	// Unix：直接原子替换（rename syscall 在同 FS 上是原子的）
-	if err := os.Rename(newExePath, exePath); err != nil {
-		return fmt.Errorf("replace exe: %w", err)
+	// 先把旧版本挪到 .old 留作退路，替换失败时还能换回来
+	oldPath := exePath + ".old"
+	_ = os.Remove(oldPath)
+	if err := os.Rename(exePath, oldPath); err != nil {
+		return fmt.Errorf("backup current exe: %w", err)
 	}
+
+	// Unix：同 FS 上 rename 是原子的
+	if err := os.Rename(newExePath, exePath); err != nil {
+		if rbErr := os.Rename(oldPath, exePath); rbErr != nil {
+			// 走到这里旧程序还在 .old，提示用户手工恢复，别让人以为文件没了
+			return fmt.Errorf("替换失败且回滚失败，请手动把 %s 改名回 %s（原因: %v / 回滚: %v）",
+				oldPath, exePath, err, rbErr)
+		}
+		return fmt.Errorf("replace exe（已回滚到原版本）: %w", err)
+	}
+
+	_ = os.Remove(oldPath)
 	logs("替换完成，请重启程序。")
 	return nil
 }
@@ -188,17 +302,9 @@ func downloadFile(url, dest string) error {
 	return err
 }
 
-// platformAssetSuffix 返回当前平台对应的 Release asset 名称片段
+// platformAssetSuffix 返回当前平台对应的 Release asset 名称片段。
+// 直接用 GOOS-GOARCH，与 CI matrix 的命名一致——原来 linux/windows 分支写死 amd64，
+// arm64 机器会去下 amd64 的包。
 func platformAssetSuffix() string {
-	switch runtime.GOOS {
-	case "windows":
-		return "windows-amd64"
-	case "darwin":
-		if runtime.GOARCH == "arm64" {
-			return "darwin-arm64"
-		}
-		return "darwin-amd64"
-	default:
-		return "linux-amd64"
-	}
+	return runtime.GOOS + "-" + runtime.GOARCH
 }

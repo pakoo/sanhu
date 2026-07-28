@@ -18,7 +18,11 @@ jobs:
           - goos: windows
             goarch: amd64
             suffix: .exe
-            asset_name: sanhu-windows-amd64.exe
+            asset_name: sanhu-windows-amd64
+          - goos: windows
+            goarch: arm64
+            suffix: .exe
+            asset_name: sanhu-windows-arm64
           - goos: darwin
             goarch: amd64
             suffix: ""
@@ -31,6 +35,10 @@ jobs:
             goarch: amd64
             suffix: ""
             asset_name: sanhu-linux-amd64
+          - goos: linux
+            goarch: arm64
+            suffix: ""
+            asset_name: sanhu-linux-arm64
 
     steps:
       - uses: actions/checkout@v4
@@ -52,34 +60,28 @@ jobs:
             -o sanhu${{ matrix.suffix }} \
             ./cmd/sanhu/
 
+      # 压缩包内的可执行文件统一叫 sanhu / sanhu.exe：
+      #  - 与 README 里「解压后运行 ./sanhu」一致
+      #  - updater 解压时按这个名字找二进制（internal/updater/extract.go looksLikeBinary）
       - name: Package (Windows zip)
         if: matrix.goos == 'windows'
         run: |
           mkdir -p dist
-          cp sanhu.exe dist/
-          cd dist && zip -9 ../sanhu-windows-amd64.zip sanhu.exe
+          cp sanhu.exe dist/sanhu.exe
+          cd dist && zip -9 ../${{ matrix.asset_name }}.zip sanhu.exe
 
       - name: Package (Unix tar.gz)
         if: matrix.goos != 'windows'
         run: |
           mkdir -p dist
-          cp sanhu${{ matrix.suffix }} dist/${{ matrix.asset_name }}
-          tar -czf ${{ matrix.asset_name }}.tar.gz -C dist ${{ matrix.asset_name }}
+          cp sanhu dist/sanhu
+          tar -czf ${{ matrix.asset_name }}.tar.gz -C dist sanhu
 
-      - name: Upload artifact (Windows)
-        if: matrix.goos == 'windows'
-        uses: actions/upload-artifact@v4
-        with:
-          # 用不含 .exe 的固定名，与 release files 路径 artifacts/sanhu-windows-amd64/ 对齐
-          name: sanhu-windows-amd64
-          path: sanhu-windows-amd64.zip
-
-      - name: Upload artifact (Unix)
-        if: matrix.goos != 'windows'
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}
-          path: ${{ matrix.asset_name }}.tar.gz
+          path: ${{ matrix.asset_name }}.${{ matrix.goos == 'windows' && 'zip' || 'tar.gz' }}
 
   release:
     name: Create GitHub Release
@@ -100,11 +102,9 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          # seed/seed.sql.gz 作为初始数据资产随 release 发布；
-          # 首启空库时由 internal/bootstrap 从 releases/latest/download/seed.sql.gz 下载。
+          # 初始数据已内嵌进二进制（embed.go SeedSQLGz），首启不再下载；
+          # 仍附带 seed.sql.gz 作为可选资产，供内网镜像用 SANHU_SEED_URL 指过来。
           files: |
-            artifacts/sanhu-windows-amd64/sanhu-windows-amd64.zip
-            artifacts/sanhu-darwin-amd64/sanhu-darwin-amd64.tar.gz
-            artifacts/sanhu-darwin-arm64/sanhu-darwin-arm64.tar.gz
-            artifacts/sanhu-linux-amd64/sanhu-linux-amd64.tar.gz
+            artifacts/*/sanhu-*.zip
+            artifacts/*/sanhu-*.tar.gz
             seed/seed.sql.gz
