@@ -15,6 +15,8 @@ import (
 var (
 	reFSName      = regexp.MustCompile(`var\s+fS_name\s*=\s*"([^"]*)"`)
 	reFSType      = regexp.MustCompile(`var\s+fS_type\s*=\s*"([^"]*)"`)
+	// 东财已经把 fS_type 从 pingzhongdata 里拿掉了，改从基本概况页读「基金类型」
+	reHTMLFundType = regexp.MustCompile(`基金类型[^<]*</th>\s*<td[^>]*>([^<]+)`)
 	reInception   = regexp.MustCompile(`成立日期[^<]*</th>\s*<td[^>]*>([0-9]{4}-[0-9]{2}-[0-9]{2})`)
 	reAUM         = regexp.MustCompile(`基金规模[^<]*</th>\s*<td[^>]*>([0-9.]+)亿元`)
 	reManager     = regexp.MustCompile(`基金经理[^<]*</th>\s*<td[^>]*><a[^>]*>([^<]+)</a>`)
@@ -54,9 +56,20 @@ func FetchFundInfo(db *sqlx.DB, code string) error {
 	feeStr := extractRegex(reFeeRate, htmlText)
 	riskLevel := strings.TrimSpace(extractRegex(reRiskLevel, htmlText))
 
+	// fS_type 已被东财下线，正常情况下这里是空的，回退到基本概况页的「基金类型」
+	if fundType == "" {
+		fundType = strings.TrimSpace(extractRegex(reHTMLFundType, htmlText))
+	}
+
 	aum, _ := strconv.ParseFloat(aumStr, 64)
 	feeRate, _ := strconv.ParseFloat(feeStr, 64)
-	category := inferCategory(fundType)
+
+	// 类型没拿到就别写 category：inferCategory("") 会返回 "mixed"，
+	// 而 UPSERT 见到非空值就覆盖，等于每天定时刷新都把正确的分类冲成"混合型"
+	category := ""
+	if fundType != "" {
+		category = inferCategory(fundType)
+	}
 
 	_, err = db.Exec(`
 		INSERT INTO funds (code, name, fund_type, category, risk_level, fee_rate,
