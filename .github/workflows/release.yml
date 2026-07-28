@@ -61,17 +61,34 @@ jobs:
             ./cmd/sanhu/
 
       # 压缩包内的可执行文件统一叫 sanhu / sanhu.exe：
-      #  - 与 README 里「解压后运行 ./sanhu」一致
       #  - updater 解压时按这个名字找二进制（internal/updater/extract.go looksLikeBinary）
+      #  - macOS 装进 .app 后路径是 sanhu.app/Contents/MacOS/sanhu，basename 仍是 sanhu，
+      #    所以自动更新照样能认出来
       - name: Package (Windows zip)
         if: matrix.goos == 'windows'
         run: |
           mkdir -p dist
           cp sanhu.exe dist/sanhu.exe
-          cd dist && zip -9 ../${{ matrix.asset_name }}.zip sanhu.exe
+          cp packaging/windows/使用说明.txt dist/ 2>/dev/null || true
+          cd dist && zip -9 -r ../${{ matrix.asset_name }}.zip .
 
-      - name: Package (Unix tar.gz)
-        if: matrix.goos != 'windows'
+      # macOS 打成 .app：下载解压后双击即用，不需要开终端。
+      # CFBundleExecutable 直接指向 Go 二进制——程序自己会开浏览器（cmd/sanhu/launch.go），
+      # 不再需要额外的 shell 启动器。
+      - name: Package (macOS .app)
+        if: matrix.goos == 'darwin'
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          APP=dist/sanhu.app
+          mkdir -p "$APP/Contents/MacOS"
+          cp sanhu "$APP/Contents/MacOS/sanhu"
+          chmod +x "$APP/Contents/MacOS/sanhu"
+          sed -e "s/__VERSION__/${VERSION}/g" packaging/macos/Info.plist > "$APP/Contents/Info.plist"
+          cp packaging/macos/使用说明.txt dist/ 2>/dev/null || true
+          cd dist && zip -9 -ry ../${{ matrix.asset_name }}.zip .
+
+      - name: Package (Linux tar.gz)
+        if: matrix.goos == 'linux'
         run: |
           mkdir -p dist
           cp sanhu dist/sanhu
@@ -81,7 +98,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}
-          path: ${{ matrix.asset_name }}.${{ matrix.goos == 'windows' && 'zip' || 'tar.gz' }}
+          path: ${{ matrix.asset_name }}.${{ matrix.goos == 'linux' && 'tar.gz' || 'zip' }}
 
   release:
     name: Create GitHub Release

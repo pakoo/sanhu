@@ -26,27 +26,36 @@ sanhu 是一个**单文件程序**：下载对应平台的可执行文件，双�
 
 ### 下载
 
-前往 **[Releases](https://github.com/pakoo/sanhu/releases/latest)** 下载你的平台对应文件：
+前往 **[Releases](https://github.com/pakoo/sanhu/releases/latest)** 下载你的平台对应文件，**解压后双击即可**：
 
-| 平台 | 文件 |
-|---|---|
-| Windows (Intel/AMD) | `sanhu-windows-amd64.zip`（解压后双击 `sanhu.exe`） |
-| Windows (ARM) | `sanhu-windows-arm64.zip` |
-| macOS (Apple 芯片) | `sanhu-darwin-arm64.tar.gz` |
-| macOS (Intel) | `sanhu-darwin-amd64.tar.gz` |
-| Linux (x86_64) | `sanhu-linux-amd64.tar.gz` |
-| Linux (ARM64) | `sanhu-linux-arm64.tar.gz` |
+| 平台 | 下载 | 怎么用 |
+|---|---|---|
+| macOS (Apple 芯片 M1/M2/M3…) | `sanhu-darwin-arm64.zip` | 解压得到 `sanhu.app`，双击 |
+| macOS (Intel) | `sanhu-darwin-amd64.zip` | 同上 |
+| Windows (64 位，绝大多数电脑) | `sanhu-windows-amd64.zip` | 解压得到 `sanhu.exe`，双击 |
+| Windows (ARM) | `sanhu-windows-arm64.zip` | 同上 |
+| Linux (x86_64) | `sanhu-linux-amd64.tar.gz` | 解压后终端运行 `./sanhu` |
+| Linux (ARM64) | `sanhu-linux-arm64.tar.gz` | 同上 |
 
-### 运行
+**双击后会自动打开浏览器**，不需要自己输网址、不需要装 Python 或任何依赖、首次启动也不需要联网。
 
-- **Windows**：解压后双击 `sanhu.exe`
-- **macOS / Linux**：解压后在终端运行 `./sanhu`（macOS 首次可能提示"无法验证开发者"，右键 → 打开 → 确认）
-
-然后浏览器打开 [http://localhost:8000](http://localhost:8000)。
-
-> **首次启动**会把内置的初始数据（基金档案 / 估值历史）解压灌库，**全程不联网**。详见 [首次启动流程](docs/first-run.md)。
+> **首次运行会被系统拦一下**，因为本软件没有购买代码签名证书（这需要每年数百美元）。这不是病毒，处理一次即可：
 >
-> 数据库存在**可执行文件同级的 `data/` 目录**里，换目录启动也不会丢数据；备份或搬迁直接拷这个目录。
+> - **macOS**：右键点 `sanhu.app` →「打开」→ 弹窗里再点一次「打开」。
+>   若系统较新不给这个选项，去「系统设置 →「隐私与安全性」，下滚找到「已阻止 sanhu」，点「仍要打开」。
+> - **Windows**：蓝色提示「Windows 已保护你的电脑」→ 点「更多信息」→「仍要运行」。
+>
+> 压缩包里附了一份《使用说明.txt》，写了同样的内容。
+
+### 数据存在哪
+
+| 平台 | 位置 |
+|---|---|
+| macOS | `~/Library/Application Support/sanhu/` |
+| Windows | `sanhu.exe` 同级的 `data\` 文件夹 |
+| Linux | 可执行文件同级的 `data/` 文件夹 |
+
+备份或换电脑，把这个目录整个拷走即可。**升级新版本不会动到它。**
 
 ### 从源码构建（开发者）
 

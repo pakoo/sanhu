@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  发布用的 .app 描述文件。__VERSION__ 由 CI 在打包时替换成 tag（去掉 v 前缀）。
+
+  CFBundleExecutable 直接就是 Go 二进制：程序自身会在服务就绪后打开浏览器
+  （cmd/sanhu/launch.go），所以不需要额外的 shell 启动器。
+  数据库不会写进 bundle 内部——config.defaultDataDir 检测到 .app 路径后
+  会改用 ~/Library/Application Support/sanhu，这样覆盖安装新版本不会连数据一起删掉。
+-->
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>sanhu</string>
+  <key>CFBundleDisplayName</key><string>散户 sanhu</string>
+  <key>CFBundleIdentifier</key><string>com.pakoo.sanhu</string>
+  <key>CFBundleExecutable</key><string>sanhu</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>__VERSION__</string>
+  <key>CFBundleVersion</key><string>__VERSION__</string>
+  <key>LSMinimumSystemVersion</key><string>11.0</string>
+  <key>NSHighResolutionCapable</key><true/>
+</dict>
+</plist>

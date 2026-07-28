@@ -48,6 +48,15 @@ func defaultDataDir() string {
 		}
 	}
 
+	// macOS .app 包：数据不能写进 bundle 内部。
+	// 一来 bundle 应当视为只读，二来用新版本覆盖 .app 时会连数据一起删掉。
+	// 统一放到 ~/Library/Application Support/sanhu。
+	if strings.Contains(exeDir, ".app/Contents/MacOS") {
+		if cfgDir, err := os.UserConfigDir(); err == nil {
+			return filepath.Join(cfgDir, "sanhu")
+		}
+	}
+
 	candidate := filepath.Join(exeDir, "data")
 	if err := os.MkdirAll(candidate, 0755); err == nil && isWritable(candidate) {
 		return candidate

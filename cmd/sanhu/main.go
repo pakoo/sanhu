@@ -24,6 +24,17 @@ func main() {
 		log.Fatalf("load config: %v", err)
 	}
 
+	// 双击第二次时不要崩：已有实例在跑就把浏览器带过去，然后正常退出。
+	// 端口被别的程序占用则明确报错，别让用户对着 "bind: address already in use" 猜。
+	if alreadyRunning(cfg.Port) {
+		log.Printf("sanhu 已在 :%d 运行，直接打开浏览器", cfg.Port)
+		openBrowser(fmt.Sprintf("http://localhost:%d", cfg.Port))
+		return
+	}
+	if portTaken(cfg.Port) {
+		log.Fatalf("端口 %d 已被其他程序占用；换个端口启动：SANHU_PORT=8123", cfg.Port)
+	}
+
 	database, err := db.Open(cfg.DataDir)
 	if err != nil {
 		log.Fatalf("open database: %v", err)
@@ -55,6 +66,10 @@ func main() {
 	// 用 ldflags 注入的 version（CI 打的是 -X main.version），
 	// cfg.Version 来自 config 包的同名变量，CI 并没有注入它，日志会永远显示 dev
 	log.Printf("sanhu %s listening on %s (data: %s)", version, addr, cfg.DataDir)
+
+	// 双击启动的用户不会自己去浏览器敲地址，等服务就绪后替他打开
+	go openBrowserWhenReady(cfg.Port)
+
 	if err := router.Run(addr); err != nil {
 		log.Fatalf("run server: %v", err)
 	}
