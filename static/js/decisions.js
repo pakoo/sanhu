@@ -114,7 +114,7 @@
         const baseFundName = d.name || d.code;
         const isVirtual = !!d.is_virtual;
         const fundName = (isVirtual ? '🧪 ' : '') + baseFundName;
-        const cardBorderLeft = isVirtual ? 'border-left:3px solid #3b82f6;' : '';
+        const cardBorderLeft = isVirtual ? 'border-left:3px solid #4f46e5;' : '';
         const hasName = !!d.name;
         const fragments = Array.isArray(d.reason_fragments) ? d.reason_fragments : [];
         const topFragments = fragments.slice(0, 3);
@@ -304,7 +304,7 @@
                     </thead>
                     <tbody>
                         ${items.map(d => `
-                            <tr style="border-bottom:1px solid var(--border);${d.is_virtual ? 'box-shadow:inset 3px 0 0 #3b82f6;background:#f8fbff;' : ''}">
+                            <tr style="border-bottom:1px solid var(--border);${d.is_virtual ? 'box-shadow:inset 3px 0 0 #4f46e5;background:#f8fbff;' : ''}">
                                 <td style="padding:8px;">${(d.created_at || '').slice(0, 10)}</td>
                                 <td style="padding:8px;">
                                     <div style="font-weight:600;">${d.is_virtual ? '🧪 ' : ''}${d.name || d.code}</div>
@@ -411,7 +411,7 @@
                         series.push({
                             name: 'HS300', type: 'line', data: hs300Line,
                             smooth: true, showSymbol: false,
-                            lineStyle: { color: '#94a3b8', width: 1.5, type: 'dashed' },
+                            lineStyle: { color: '#a5add8', width: 1.5, type: 'dashed' },
                         });
                     }
                     chart.setOption({
@@ -907,11 +907,11 @@
         const map = {
             pending:      ['#dbeafe', '#1d4ed8', '待执行'],
             executed:     ['#dcfce7', '#15803d', '已执行'],
-            cancelled:    ['#f1f5f9', '#94a3b8', '已取消'],
+            cancelled:    ['#f1f5f9', '#a5add8', '已取消'],
             triggered_tp: ['#dcfce7', '#15803d', '🎯止盈触发'],
             triggered_sl: ['#fee2e2', '#b91c1c', '⚠️止损触发'],
         };
-        const [bg, color, label] = map[s] || ['#f1f5f9', '#94a3b8', s];
+        const [bg, color, label] = map[s] || ['#f1f5f9', '#a5add8', s];
         return `<span style="font-size:11px;padding:2px 7px;border-radius:4px;background:${bg};color:${color};">${label}</span>`;
     }
 

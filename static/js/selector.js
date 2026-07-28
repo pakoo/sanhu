@@ -185,7 +185,7 @@
         // warning banner
         if (warnings.length > 0) {
             gapContainer.insertAdjacentHTML('afterend', `
-                <div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:8px;padding:10px 14px;
+                <div style="background:#fef3c7;border:1px solid #f59e0b;border-radius:8px;padding:10px 14px;
                             font-size:13px;color:#92400e;margin-bottom:12px;">
                     ⚠️ ${warnings.join(' · ')}
                 </div>

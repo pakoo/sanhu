@@ -101,7 +101,7 @@ function _renderWatchlist() {
             <td style="padding:8px 10px;text-align:center;">${scoreBadge}</td>
             <td style="padding:8px 10px;text-align:center;">
                 <button onclick="removeFundFromWatchlist('${d.code}','${d.name.replace(/'/g,"\\'")}','${d.is_holding}')"
-                    title="移除关注" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:16px;">🗑</button>
+                    title="移除关注" style="background:none;border:none;cursor:pointer;color:#f43f5e;font-size:16px;">🗑</button>
             </td>
         </tr>`;
     }).join('');
@@ -143,7 +143,7 @@ function _renderSparkline(elId, navValues) {
     } catch (e) { return; }
 
     const isPositive = navValues[navValues.length - 1] >= navValues[0];
-    const color = isPositive ? '#22c55e' : '#ef4444';
+    const color = isPositive ? '#22c55e' : '#f43f5e';
 
     chart.setOption({
         animation: false,
@@ -178,8 +178,8 @@ function _renderWlValuation() {
 
     const barHtml = (label, pct, signal) => {
         if (!pct) return '';
-        const color = pct > 70 ? '#ef4444' : pct < 30 ? '#22c55e' : '#f59e0b';
-        const sigColor = pct > 70 ? '#ef4444' : pct < 30 ? '#22c55e' : '#d97706';
+        const color = pct > 70 ? '#f43f5e' : pct < 30 ? '#22c55e' : '#f59e0b';
+        const sigColor = pct > 70 ? '#f43f5e' : pct < 30 ? '#22c55e' : '#d97706';
         return `<div style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:4px;">
             <span style="color:var(--text-secondary);width:50px;">${label}</span>
             <div style="flex:1;height:6px;background:var(--border);border-radius:3px;max-width:120px;">
@@ -245,7 +245,7 @@ function searchAddFund(q) {
                 </div>`;
             }).join('');
         } catch (e) {
-            resultsEl.innerHTML = `<div style="padding:12px;color:#ef4444;font-size:13px;">搜索失败：${e.message}</div>`;
+            resultsEl.innerHTML = `<div style="padding:12px;color:#f43f5e;font-size:13px;">搜索失败：${e.message}</div>`;
         }
     }, 400);
 }

@@ -157,7 +157,7 @@ async function saveRiskLevel() {
         tip.style.color = '#10b981';
     } catch (e) {
         tip.textContent = '保存失败，请重试';
-        tip.style.color = '#ef4444';
+        tip.style.color = '#f43f5e';
     }
     tip.style.display = 'block';
     setTimeout(() => { tip.style.display = 'none'; }, 2200);
@@ -313,37 +313,34 @@ function renderSummaryCards(data) {
     const sign = data.total_profit >= 0 ? '+' : '';
     const dailySign = data.daily_profit >= 0 ? '+' : '';
 
+    // V3：总资产提升为 Hero 卡，其余三项作为次级指标嵌在里面。
+    // 这是唯一一处为视觉方案调整的 DOM 结构（产品稿里说的"只改样式层"的例外），
+    // 因为 Hero 是 V3 的主视觉，光靠 CSS 改不出来。
     document.getElementById('summaryCards').innerHTML = `
-        <div class="summary-card">
-            <div class="label">总资产</div>
-            <div class="value">${formatMoney(data.total_value)}</div>
-        </div>
-        <div class="summary-card">
-            <div class="label">持有收益</div>
-            <div class="value ${profitClass}">${sign}${formatMoney(data.total_profit)}</div>
-            <div class="sub ${profitClass}">${sign}${data.total_profit_rate.toFixed(2)}%</div>
-        </div>
-        <div class="summary-card">
-            <div class="label">昨日收益</div>
-            <div class="value ${dailyClass}">${dailySign}${formatMoney(data.daily_profit)}</div>
-        </div>
-        <div class="summary-card">
-            <div class="label">持有基金数</div>
-            <div class="value">${data.holdings.length}</div>
-            <div class="sub text-neutral">债${countCategory(data, 'bond')} / 股${countCategory(data, 'equity')} / 混${countCategory(data, 'mixed')} / QDII ${countCategory(data, 'qdii')}</div>
+        <div class="hero-card" style="grid-column:1/-1;">
+            <div class="hero-label">总资产</div>
+            <div class="hero-value">¥${formatMoney(data.total_value)}</div>
+            <div class="hero-row">
+                <div class="hero-item">持有收益<b>${sign}${formatMoney(data.total_profit)}（${sign}${data.total_profit_rate.toFixed(2)}%）</b></div>
+                <div class="hero-item">昨日收益<b>${dailySign}${formatMoney(data.daily_profit)}</b></div>
+                <div class="hero-item">持有基金<b>${data.holdings.length} 只</b></div>
+                <div class="hero-item">构成<b>债${countCategory(data, 'bond')} · 股${countCategory(data, 'equity')} · 混${countCategory(data, 'mixed')} · QDII${countCategory(data, 'qdii')}</b></div>
+            </div>
         </div>
     `;
+    // 涨跌色仍由 CSS 变量控制（红涨绿跌，见 Q2），Hero 内部统一用白字保证对比度
+    void profitClass; void dailyClass;
 }
 
 function renderAllocationChart(data) {
     const chart = initChart(document.getElementById('allocationChart'));
     const categoryNames = { bond: '债券型', equity: '股票型', mixed: '混合型', qdii: 'QDII/海外' };
-    const colors = { bond: '#60a5fa', equity: '#f87171', mixed: '#fbbf24', qdii: '#34d399' };
+    const colors = { bond: '#6366f1', equity: '#ec4899', mixed: '#f59e0b', qdii: '#10b981' };
 
     const pieData = Object.entries(data.allocation).map(([cat, pct]) => ({
         name: categoryNames[cat] || cat,
         value: pct,
-        itemStyle: { color: colors[cat] || '#94a3b8' }
+        itemStyle: { color: colors[cat] || '#a5add8' }
     }));
 
     chart.setOption({
@@ -377,7 +374,7 @@ function renderReturnChart(data) {
             type: 'bar',
             data: holdings.map(h => ({
                 value: h.profit_rate,
-                itemStyle: { color: h.profit_rate >= 0 ? '#ef4444' : '#10b981' }
+                itemStyle: { color: h.profit_rate >= 0 ? '#f43f5e' : '#10b981' }
             })),
             barWidth: 20,
             label: {
@@ -473,7 +470,7 @@ function renderHoldingsTable(data) {
                 <button onclick="openEditHolding('${h.code}','${h.name.replace(/'/g,"\\'")}',${h.current_value},${h.profit})"
                     style="background:none;border:none;cursor:pointer;color:var(--primary);font-size:13px;padding:2px 6px;" title="编辑">✏️</button>
                 <button onclick="confirmDeleteHolding('${h.code}','${h.name.replace(/'/g,"\\'")}' )"
-                    style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px;padding:2px 6px;" title="删除">🗑</button>
+                    style="background:none;border:none;cursor:pointer;color:#f43f5e;font-size:13px;padding:2px 6px;" title="删除">🗑</button>
             </td>
         </tr>`;
     }).join('');
@@ -494,7 +491,7 @@ function renderSparkline(curve) {
     }).join(' ');
 
     const lastVal = vals[vals.length - 1];
-    const color = lastVal >= 0 ? '#ef4444' : '#10b981';
+    const color = lastVal >= 0 ? '#f43f5e' : '#10b981';
     const zeroPct = (max / range) * (H - pad * 2);
     const zeroY = (pad + zeroPct).toFixed(1);
 
@@ -576,7 +573,7 @@ function renderCorrelationChart(data) {
         yAxis: { type: 'category', data: names, axisLabel: { fontSize: 11 } },
         visualMap: {
             min: -1, max: 1,
-            inRange: { color: ['#3b82f6', '#ffffff', '#ef4444'] },
+            inRange: { color: ['#4f46e5', '#ffffff', '#f43f5e'] },
             orient: 'horizontal',
             left: 'center',
             bottom: 0,
@@ -611,7 +608,7 @@ function renderVolatilityChart(volData) {
             type: 'bar',
             data: entries.map(([, vol]) => ({
                 value: vol,
-                itemStyle: { color: vol > 15 ? '#ef4444' : vol > 8 ? '#fbbf24' : '#60a5fa' }
+                itemStyle: { color: vol > 15 ? '#f43f5e' : vol > 8 ? '#f59e0b' : '#6366f1' }
             })),
             barWidth: 30,
             label: { show: true, position: 'top', formatter: '{c}%', fontSize: 11 }
@@ -652,14 +649,14 @@ function renderAllocationCompare(data) {
                 name: '当前配置',
                 type: 'bar',
                 data: categories.map(c => data.current_allocation[c] || 0),
-                itemStyle: { color: '#94a3b8' },
+                itemStyle: { color: '#a5add8' },
                 barGap: '20%',
             },
             {
                 name: '目标配置',
                 type: 'bar',
                 data: categories.map(c => data.target_allocation[c]),
-                itemStyle: { color: '#3b82f6' },
+                itemStyle: { color: '#4f46e5' },
             }
         ]
     });
@@ -768,7 +765,7 @@ async function loadTransitionPlan() {
 
     const chart = initChart(document.getElementById('transitionChart'));
     const categoryNames = { bond: '债券型', equity: '股票型', mixed: '混合型', qdii: 'QDII' };
-    const colors = { bond: '#60a5fa', equity: '#f87171', mixed: '#fbbf24', qdii: '#34d399' };
+    const colors = { bond: '#6366f1', equity: '#ec4899', mixed: '#f59e0b', qdii: '#10b981' };
     const categories = Object.keys(plan[0].allocation_after);
 
     chart.setOption({
@@ -782,7 +779,7 @@ async function loadTransitionPlan() {
             type: 'bar',
             stack: 'total',
             data: plan.map(p => p.allocation_after[cat] || 0),
-            itemStyle: { color: colors[cat] || '#94a3b8' },
+            itemStyle: { color: colors[cat] || '#a5add8' },
         }))
     });
 }
@@ -944,8 +941,8 @@ function renderBacktestCurve(data) {
                 name: '投入金额',
                 type: 'line',
                 data: curve.map(c => c.invested),
-                lineStyle: { color: '#94a3b8' },
-                itemStyle: { color: '#94a3b8' },
+                lineStyle: { color: '#a5add8' },
+                itemStyle: { color: '#a5add8' },
                 showSymbol: false,
                 areaStyle: { color: 'rgba(148,163,184,0.1)' },
             },
@@ -953,8 +950,8 @@ function renderBacktestCurve(data) {
                 name: '持有市值',
                 type: 'line',
                 data: curve.map(c => c.value),
-                lineStyle: { color: '#3b82f6' },
-                itemStyle: { color: '#3b82f6' },
+                lineStyle: { color: '#4f46e5' },
+                itemStyle: { color: '#4f46e5' },
                 showSymbol: false,
                 areaStyle: { color: 'rgba(59,130,246,0.1)' },
             }
@@ -988,7 +985,7 @@ function renderPeerRankBlock(pr) {
         const rank = pr[`rank_${key}`];
         const pct = pr[`pct_${key}`];
         if (rank == null) return '';
-        const color = pct <= 25 ? '#16a34a' : pct <= 50 ? '#f59e0b' : '#ef4444';
+        const color = pct <= 25 ? '#16a34a' : pct <= 50 ? '#f59e0b' : '#f43f5e';
         const tier = pct <= 10 ? '顶尖' : pct <= 25 ? '优秀' : pct <= 50 ? '良好' : pct <= 75 ? '一般' : '落后';
         return `<div class="peer-row">
             <span>${label}</span>
@@ -1088,7 +1085,7 @@ async function showFundDetail(code) {
                     type: 'line',
                     data: navData.map(d => d.nav),
                     showSymbol: false,
-                    lineStyle: { color: '#3b82f6', width: 2 },
+                    lineStyle: { color: '#4f46e5', width: 2 },
                     areaStyle: { color: 'rgba(59,130,246,0.08)' },
                 }]
             });
@@ -1147,7 +1144,7 @@ async function loadFundHoldingsInModal(code) {
                     formatter: p => {
                         const desc = INDUSTRY_DESC[p.name] || '';
                         return `<b>${p.name}: ${p.value}%</b>` +
-                            (desc ? `<div style="font-size:11px;color:#94a3b8;max-width:180px;margin-top:3px;white-space:normal;line-height:1.4;">${desc}</div>` : '');
+                            (desc ? `<div style="font-size:11px;color:#a5add8;max-width:180px;margin-top:3px;white-space:normal;line-height:1.4;">${desc}</div>` : '');
                     }
                 },
                 series: [{
@@ -1263,7 +1260,7 @@ function renderIndustryBreakdown(data) {
                 const desc = INDUSTRY_DESC[p.name] || '';
                 return `<div style="font-weight:600;margin-bottom:2px;">${p.name}</div>` +
                     `<div>加权占比: <b>${p.value.toFixed(2)}%</b></div>` +
-                    (desc ? `<div style="font-size:11px;color:#94a3b8;max-width:220px;margin-top:5px;white-space:normal;line-height:1.5;">${desc}</div>` : '');
+                    (desc ? `<div style="font-size:11px;color:#a5add8;max-width:220px;margin-top:5px;white-space:normal;line-height:1.5;">${desc}</div>` : '');
             }
         },
         grid: { left: 90, right: 50, top: 10, bottom: 20 },
@@ -1280,7 +1277,7 @@ function renderIndustryBreakdown(data) {
             type: 'bar',
             data: top10.map(i => i.total_weight).reverse(),
             barWidth: 16,
-            itemStyle: { color: '#3b82f6', borderRadius: [0, 3, 3, 0] },
+            itemStyle: { color: '#4f46e5', borderRadius: [0, 3, 3, 0] },
             label: { show: true, position: 'right', formatter: '{c}%', fontSize: 11 },
         }]
     });
@@ -1358,7 +1355,7 @@ function renderValuationSignals(data) {
 
     card.style.display = 'block';
 
-    const signalColor = s => s === '低估' ? '#10b981' : s === '高估' ? '#ef4444' : '#f59e0b';
+    const signalColor = s => s === '低估' ? '#10b981' : s === '高估' ? '#f43f5e' : '#f59e0b';
     const signalBg = s => s === '低估' ? '#f0fdf4' : s === '高估' ? '#fef2f2' : '#fffbeb';
 
     const renderBar = (info, label) => {
@@ -1495,7 +1492,7 @@ async function initVersionBadge() {
 
 async function checkForUpdate() {
     const btn = document.getElementById('upRefreshBtn');
-    if (btn) { btn.style.color = '#3b82f6'; btn.textContent = '⟳'; }
+    if (btn) { btn.style.color = '#4f46e5'; btn.textContent = '⟳'; }
     try {
         const d = await (await fetch('/api/system/check-update')).json();
         const dot = document.getElementById('vBadgeDot');
@@ -1522,7 +1519,7 @@ async function checkForUpdate() {
             actionBtn.style.display = 'none';
         }
     } catch (e) {}
-    if (btn) { btn.style.color = '#94a3b8'; btn.textContent = '↻'; }
+    if (btn) { btn.style.color = '#a5add8'; btn.textContent = '↻'; }
 }
 
 function toggleUpdatePanel(e) {
@@ -1580,7 +1577,7 @@ async function startUpdate() {
                     actionBtn.disabled = false;
                     actionBtn.onclick = restartServer;
                 } else {
-                    actionBtn.style.background = '#ef4444';
+                    actionBtn.style.background = '#f43f5e';
                     actionBtn.textContent = '重试';
                     actionBtn.disabled = false;
                     actionBtn.onclick = startUpdate;

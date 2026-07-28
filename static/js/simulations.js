@@ -312,7 +312,7 @@
                     text: '暂无 PnL 曲线',
                     left: 'center',
                     top: 'middle',
-                    textStyle: { fontSize: 14, fontWeight: 500, color: '#94a3b8' },
+                    textStyle: { fontSize: 14, fontWeight: 500, color: '#a5add8' },
                 },
                 xAxis: { show: false, type: 'category', data: [] },
                 yAxis: { show: false, type: 'value' },
@@ -352,7 +352,7 @@
                 data: snapshots.map(item => item.total_value),
                 smooth: true,
                 showSymbol: false,
-                lineStyle: { color: '#2563eb', width: 2.5 },
+                lineStyle: { color: '#4338ca', width: 2.5 },
                 areaStyle: {
                     color: {
                         type: 'linear',
