@@ -1,6 +1,7 @@
 # Go build artifacts
 /sanhu
 /sanhu.exe
+/sanhu.app/
 dist/
 *.old
 .gocache/
