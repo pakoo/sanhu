@@ -1,0 +1,995 @@
+<!doctype html>
+<!-- ============================================================================
+     录入持仓方式调整 · 产品稿
+     基于 ~/.claude/templates/product-spec-template.html，决策卡引擎原样保留
+     交付前跑：node ~/.claude/hooks/check-product-spec.mjs docs/product-specs/data-entry.html
+     ============================================================================ -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>录入持仓方式调整 · 产品稿</title>
+<style>
+:root{
+  --bg:#eef2f6; --panel:#fff;
+  --ink:#22303f; --ink-2:#54687c; --muted:#93a3b3; --line:#e4edf4;
+  --primary:#7cb4de; --primary-deep:#4b89bb; --primary-soft:#eef7ff;
+  --danger:#e2685f;
+  --shadow:0 8px 20px rgba(63,96,127,.10);
+  --shadow-sm:0 3px 10px rgba(63,96,127,.07);
+  --dq-open:#e9a23b; --dq-open-bg:#fffaf0;
+  --dq-done:#52a67c; --dq-done-bg:#f2faf6;
+  /* 产品自身的主题色（sanhu 前端用的紫蓝） */
+  --app:#5b5bd6; --app-soft:#eef0fd;
+  --profit:#ef4444; --loss:#10b981;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+.doc{max-width:1560px;margin:0 auto;padding:0 26px 90px}
+h1{font-size:25px;font-weight:800;margin:0 0 6px}
+h2.sec{font-size:19px;font-weight:800;margin:38px 0 14px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;scroll-margin-top:76px}
+h2.sec::before{content:"";width:5px;height:19px;border-radius:3px;background:var(--primary-deep)}
+h3.sub3{font-size:15px;font-weight:800;margin:26px 0 10px;color:var(--ink)}
+.doc-head{padding:30px 0 6px}
+.doc-head .sub{font-size:13px;color:var(--ink-2);line-height:1.9}
+.pill{display:inline-block;font-size:11.5px;font-weight:800;border-radius:20px;padding:3px 11px;margin-right:7px}
+.pill.draft{background:#fff4e2;color:#a8720f}
+.pill.base{background:var(--primary-soft);color:var(--primary-deep)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 19px;box-shadow:var(--shadow-sm);font-size:13.5px;line-height:1.85;color:var(--ink-2)}
+.card b{color:var(--ink)}
+.card.warn{background:#fffaf0;border-color:#f0dcb8}
+table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:10px 0}
+th{background:#f7fafc;text-align:left;padding:9px 12px;font-weight:700;color:var(--ink-2);border-bottom:1px solid var(--line)}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+code{background:#f1f4f7;border-radius:5px;padding:1px 5px;font-size:12px;font-family:"SF Mono",Menlo,monospace;color:#b8446a}
+.scrollx{overflow-x:auto}
+.tag-new{background:#e8f6ee;color:#2f7d58;border:1px solid #cbe8da;border-radius:5px;font-size:10.5px;font-weight:800;padding:1px 7px}
+.tag-mod{background:#fff4e2;color:#a8720f;border:1px solid #f0dcb8;border-radius:5px;font-size:10.5px;font-weight:800;padding:1px 7px}
+.tag-keep{background:#f4f7fa;color:#6c8092;border:1px solid #dde7ef;border-radius:5px;font-size:10.5px;font-weight:700;padding:1px 7px}
+
+/* ---- 桌面窗口框（本产品是桌面 Web，不是小程序，故不用 390px 手机框）---- */
+.row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+.wcol{flex:0 0 470px;max-width:100%}
+.wcol.wide{flex:0 0 720px}
+.cap{font-size:13px;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.cap .no{background:var(--primary-deep);color:#fff;border-radius:7px;padding:2px 8px;font-size:11px;font-weight:800}
+.capsub{font-size:11.5px;color:var(--muted);margin:-3px 0 9px;line-height:1.6}
+.win{width:100%;border-radius:12px;overflow:hidden;background:#fff;box-shadow:var(--shadow);border:1px solid var(--line)}
+.win .bar{height:30px;background:#f2f5f8;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:5px;padding:0 11px}
+.win .bar i{width:9px;height:9px;border-radius:50%;background:#dbe3ea;font-style:normal}
+.win .bar .url{margin-left:9px;font-size:10.5px;color:var(--muted);background:#fff;border:1px solid var(--line);border-radius:11px;padding:2px 12px}
+.win .top{background:var(--app);color:#fff;padding:9px 13px;font-size:12.5px;font-weight:800;display:flex;align-items:center;justify-content:space-between}
+.win .top .v{font-size:9.5px;background:rgba(255,255,255,.22);border-radius:9px;padding:1px 7px;font-weight:700}
+.win .tabs{display:flex;gap:14px;padding:8px 13px;border-bottom:1px solid var(--line);font-size:11px;color:var(--muted);overflow:hidden}
+.win .tabs b{color:var(--app);border-bottom:2px solid var(--app);padding-bottom:4px}
+.win .body{padding:13px;min-height:180px;background:#f7f9fc}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:10px}
+.kpi{background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px 9px}
+.kpi .l{font-size:9px;color:var(--muted);margin-bottom:3px}
+.kpi .v{font-size:15px;font-weight:800}
+.kpi .v.zero{color:#c3ccd6}
+.panelbox{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px}
+.donut-empty{width:96px;height:96px;border-radius:50%;border:17px solid #e6ebf1;margin:8px auto}
+.btn{display:inline-block;border-radius:8px;padding:6px 13px;font-size:11.5px;font-weight:800;border:1px solid var(--line);background:#fff;color:var(--ink-2)}
+.btn.pri{background:var(--app);border-color:var(--app);color:#fff}
+.btn.lg{padding:9px 20px;font-size:13px;border-radius:9px}
+.btn.ghost{background:transparent;border:none;color:var(--app);text-decoration:underline;padding:4px 0}
+.inp{background:#fff;border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:11px;color:var(--muted)}
+.emptybox{text-align:center;padding:22px 14px}
+.emptybox .big{font-size:14.5px;font-weight:800;color:var(--ink);margin-bottom:5px}
+.emptybox .small{font-size:11.5px;color:var(--ink-2);line-height:1.8;margin-bottom:12px}
+.modal-mock{background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:var(--shadow);padding:13px}
+.mtabs{display:flex;border-bottom:2px solid var(--line);margin-bottom:11px}
+.mtabs span{flex:1;text-align:center;padding:7px;font-size:11.5px;font-weight:800;color:var(--muted)}
+.mtabs span.on{color:var(--app);border-bottom:2px solid var(--app);margin-bottom:-2px}
+.rowline{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.rowline .inp{flex:1;min-width:0}
+.minitab{width:100%;font-size:10.5px;border:1px solid var(--line);border-radius:7px;overflow:hidden;background:#fff}
+.minitab .h,.minitab .r{display:flex}
+.minitab .h{background:#f7fafc;font-weight:700;color:var(--ink-2)}
+.minitab .h div,.minitab .r div{flex:1;padding:5px 7px;border-bottom:1px solid var(--line)}
+.badge-load{display:inline-flex;align-items:center;gap:5px;background:var(--app-soft);color:var(--app);border-radius:11px;padding:2px 9px;font-size:9.5px;font-weight:800}
+.badge-bad{display:inline-flex;align-items:center;gap:5px;background:#fdecea;color:#c0392b;border-radius:11px;padding:2px 9px;font-size:9.5px;font-weight:800}
+.note-in-frame{font-size:10px;color:var(--muted);margin-top:7px;line-height:1.7}
+.flow{font-family:"SF Mono",Menlo,monospace;font-size:12px;line-height:2;white-space:pre;overflow-x:auto;color:var(--ink-2)}
+.flow b{color:var(--ink)}
+.flow .bad{color:var(--danger);font-weight:700}
+
+/* ============ 内联决策卡（勿删）============ */
+.dqbar{position:sticky;top:0;z-index:200;margin:0 -26px 18px;padding:11px 26px;
+  background:rgba(238,242,246,.94);backdrop-filter:blur(10px);border-bottom:1px solid #d7e3ec;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.dqbar .p-txt{font-size:13px;font-weight:800;white-space:nowrap}
+.dqbar .p-txt em{font-style:normal;color:var(--dq-open)}
+.dqbar .p-txt.all-done em{color:var(--dq-done)}
+.dqbar .p-track{flex:1;min-width:120px;height:8px;border-radius:5px;background:#d3e0ea;overflow:hidden}
+.dqbar .p-fill{height:100%;width:0;border-radius:5px;background:linear-gradient(90deg,#8ecfae,var(--dq-done));transition:width .25s}
+.dqbar button{font-size:12.5px;font-weight:700;padding:7px 15px;border-radius:19px;cursor:pointer;
+  border:1px solid #c6d6e2;background:#fff;color:var(--ink-2);white-space:nowrap}
+.dqbar button:hover{border-color:var(--primary);color:var(--primary-deep)}
+.dqbar button.primary{background:var(--primary-deep);border-color:var(--primary-deep);color:#fff}
+.dqbar button.ghost-danger:hover{border-color:var(--danger);color:var(--danger)}
+
+.dqrail{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:190;
+  display:flex;flex-direction:column;gap:8px;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);
+  border:1px solid #dce7ef;border-radius:22px;padding:10px 8px;box-shadow:var(--shadow-sm)}
+.dqrail .rdot{width:26px;height:26px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:10.5px;font-weight:800;background:var(--dq-open-bg);color:var(--dq-open);border:1.5px solid var(--dq-open);transition:.15s}
+.dqrail .rdot:hover{transform:scale(1.12)}
+.dqrail .rdot.done{background:var(--dq-done-bg);color:var(--dq-done);border-color:var(--dq-done)}
+@media(max-width:1180px){.dqrail{display:none}}
+
+.dq{margin:16px 0 6px;border-radius:14px;border:1px solid #f0dcb8;border-left:6px solid var(--dq-open);
+  background:var(--dq-open-bg);padding:15px 18px 16px;scroll-margin-top:78px;box-shadow:var(--shadow-sm)}
+.dq.answered{border-color:#cbe8da;border-left-color:var(--dq-done);background:var(--dq-done-bg)}
+.dq-hd{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:4px}
+.dq-id{background:var(--dq-open);color:#fff;font-size:11.5px;font-weight:800;border-radius:7px;padding:2px 9px}
+.dq.answered .dq-id{background:var(--dq-done)}
+.dq-state{font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;background:#fff;color:var(--dq-open);border:1px solid #f0dcb8}
+.dq.answered .dq-state{color:var(--dq-done);border-color:#cbe8da}
+.dq:not(.answered) .dq-state{animation:dqPulse 2.2s ease-in-out infinite}
+@keyframes dqPulse{0%,100%{opacity:1}50%{opacity:.45}}
+.dq-q{font-size:14.5px;font-weight:800;line-height:1.6}
+.dq-sub{font-size:12.5px;color:var(--ink-2);line-height:1.8;margin-top:5px}
+.dq-sub code{background:#fff;border:1px solid #e6d9c0}
+.dq-opts{margin-top:11px;display:flex;flex-direction:column;gap:8px}
+.dq-opt{display:flex;align-items:flex-start;gap:10px;cursor:pointer;background:#fff;
+  border:1.5px solid #e8dcc4;border-radius:11px;padding:11px 13px;transition:.15s}
+.dq-opt:hover{border-color:var(--dq-open);box-shadow:0 2px 8px rgba(233,162,59,.13)}
+.dq-opt input{width:17px;height:17px;margin-top:2px;flex:none;accent-color:var(--dq-done);cursor:pointer}
+.dq-opt.sel{border-color:var(--dq-done);background:var(--dq-done-bg)}
+.dq-opt .o-body{flex:1;min-width:0}
+.dq-opt .o-t{font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.dq-opt .o-d{font-size:12px;color:var(--ink-2);line-height:1.75;margin-top:3px}
+.rec-chip{background:var(--primary-soft);color:var(--primary-deep);border:1px solid #cfe6f7;border-radius:5px;font-size:10.5px;font-weight:800;padding:1px 7px;white-space:nowrap}
+.cost-chip{background:#f4f7fa;color:#6c8092;border:1px solid #dde7ef;border-radius:5px;font-size:10.5px;font-weight:700;padding:1px 7px;white-space:nowrap}
+.dq-note{margin-top:10px}
+.dq-note label{display:block;font-size:11.5px;color:var(--muted);font-weight:700;margin-bottom:5px}
+.dq-note textarea{width:100%;min-height:52px;resize:vertical;border:1.5px solid #e8dcc4;border-radius:10px;
+  padding:9px 11px;font-size:13px;font-family:inherit;line-height:1.7;background:#fff}
+.dq-note textarea:focus{outline:none;border-color:var(--dq-open)}
+
+.sec-badge{display:inline-flex;align-items:center;gap:5px;background:var(--dq-open-bg);color:#a8720f;
+  border:1px solid #f0dcb8;border-radius:20px;font-size:11.5px;font-weight:800;padding:3px 11px}
+.sec-badge.done{background:var(--dq-done-bg);color:#2f7d58;border-color:#cbe8da}
+.sec-badge i{width:7px;height:7px;border-radius:50%;background:var(--dq-open);font-style:normal}
+.sec-badge.done i{background:var(--dq-done)}
+
+.dqsum-row{display:flex;align-items:flex-start;gap:12px;padding:11px 13px;border-radius:11px;background:#fff;
+  border:1px solid var(--line);border-left:4px solid var(--dq-open);margin-bottom:9px;cursor:pointer}
+.dqsum-row.done{border-left-color:var(--dq-done)}
+.dqsum-row .s-id{font-size:12px;font-weight:800;color:var(--ink);flex:none;width:34px}
+.dqsum-row .s-q{flex:1;min-width:0;font-size:12.5px;color:var(--ink-2);line-height:1.7}
+.dqsum-row .s-a{flex:none;max-width:46%;font-size:12.5px;font-weight:800;color:var(--dq-done);text-align:right;line-height:1.7}
+.dqsum-row:not(.done) .s-a{color:var(--dq-open)}
+.dqsum-row .s-a .s-note{display:block;font-weight:600;color:var(--ink-2);font-size:11.5px;margin-top:3px}
+.dq-out{width:100%;min-height:130px;resize:vertical;margin-top:12px;border:1.5px solid var(--line);border-radius:12px;
+  padding:12px 14px;font-family:"SF Mono",Menlo,monospace;font-size:12.5px;line-height:1.85;background:#fbfdff}
+.dq-out:focus{outline:none;border-color:var(--primary)}
+.copy-hint{font-size:12px;color:var(--muted);margin-top:9px;line-height:1.8}
+.toast{position:fixed;left:50%;bottom:38px;transform:translateX(-50%) translateY(14px);background:rgba(34,48,63,.94);
+  color:#fff;font-size:13px;font-weight:700;padding:11px 22px;border-radius:24px;z-index:400;opacity:0;pointer-events:none;transition:.22s}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <!-- ===== 决策进度条 + 浮标（勿删）===== -->
+  <div class="dqbar">
+    <span class="p-txt" id="pTxt">0 / 0 已决策</span>
+    <div class="p-track"><div class="p-fill" id="pFill"></div></div>
+    <button id="btnNext">跳到下一个待决策 ↓</button>
+    <button class="primary" id="btnCopyTop">复制答案给 Claude</button>
+    <button class="ghost-danger" id="btnReset">清空</button>
+  </div>
+  <div class="dqrail" id="dqRail"></div>
+
+  <!-- ===== ① 标题 ===== -->
+  <div class="doc-head">
+    <h1>录入持仓方式调整 — 产品稿</h1>
+    <div class="sub">
+      <span class="pill draft">Q6 待确认</span><span class="pill base">桌面 Web · 基准宽 1280px（非小程序，不用 390 手机框）</span><br>
+      落地文件：<b>static/index.html · static/js/importer.js · static/js/app.js · internal/handler/import.go</b><br>
+      日期：<b>2026-07-28</b>　·　Q1/Q2/Q3/Q5 <b>已确认并已落地</b>（提交 dc51f24、b8aac72）；Q4 选了「移入设置页」，但设置页尚不存在 → 见 <b>Q6 / Q7</b>
+    </div>
+  </div>
+
+  <!-- ===== ② 背景与调性 ===== -->
+  <section>
+    <h2 class="sec">一、背景与调性</h2>
+    <div class="card">
+      <b>先澄清一件事：</b>「手动录入」<b>已经是默认 Tab</b> —— <code>importTabManual</code> 在
+      <code>index.html:850</code> 默认高亮，截图导入是第二个 Tab。所以本轮不是从零做手动录入，
+      而是决定<b>把它推到多前面</b>、以及<b>补上它现在缺的那半截</b>。<br><br>
+
+      <b>真正的痛点（实测，不是猜）：</b><br>
+      ① <b>新用户落地是一片空白</b>。全新安装打开首页：四个 0、一个灰甜甜圈、空柱状图，
+      持仓明细表<code>&lt;tbody&gt;</code>一行都没有、连一句「还没有持仓」都不写。
+      唯一的入口「更新持仓」按钮在首屏之下。<br>
+      ② <b>录进去的基金大概率显示 0 元</b>。内置数据只有 <b>11 只基金</b>，录入库里没有的基金时，
+      <code>import.go:162</code> 只写一行 <code>INSERT OR IGNORE INTO funds (code, name)</code> —— 没有 fund_type、没有净值。
+      于是 <code>shares = 金额 / 净值</code> 算不出来只能落 0，持仓市值 <code>= 净值 × 份额 = 0</code>。<br><br>
+
+      <div class="card warn" style="box-shadow:none;margin:0">
+        <b>实测：</b>在全新实例里手工录入「110022 易方达消费行业，持有金额 50000，收益 3000」，得到的是 ——<br>
+        <code>名称: "110022"　市值: 0　成本: 47000　净值: 470000000</code><br>
+        名称显示成代码；<b>5 万块市值直接变 0</b>；净值那个 4.7 亿是兜底公式
+        <code>成本 / max(份额, 0.0001)</code> 在份额为 0 时算出来的。总资产 0，收益率 −100%。<br>
+        <b>这不是边缘情况 —— 用户的基金有九成不在那 11 只里。</b>
+      </div><br>
+
+      <b>调性：</b>工具感 / 克制 / 不劝诱交易。录入是「把你已经买的东西抄进来」，不是开户，
+      语气要像记账本，不像券商 App。<br>
+      <b>不在本轮范围：</b>交易流水（买入/卖出记录）的录入改造、持仓透视、OCR 引擎更换、基金搜索能力。
+    </div>
+  </section>
+
+  <!-- ===== ③ 页面编号索引 ===== -->
+  <section>
+    <h2 class="sec">二、页面编号索引</h2>
+    <div class="scrollx">
+      <table>
+        <tr><th style="width:64px">编号</th><th style="width:180px">页面 / 区块</th><th style="width:210px">落地位置</th><th>说明</th><th style="width:76px">状态</th></tr>
+        <tr><td><b>E0</b></td><td>现状：空态首页</td><td><code>index.html</code> 总览 Tab</td><td>作为对照，画出现在长什么样</td><td><span class="tag-keep">现状</span></td></tr>
+        <tr><td><b>E1</b></td><td>空态引导（三方案）</td><td><code>app.js</code> renderSummaryCards 前</td><td>持仓为 0 时的第一屏引导，本稿核心</td><td><span class="tag-new">新增</span></td></tr>
+        <tr><td><b>E2</b></td><td>更新持仓弹窗 · 手动</td><td><code>index.html:860</code></td><td>已存在，本轮只改文案与字段</td><td><span class="tag-mod">改动</span></td></tr>
+        <tr><td><b>E3</b></td><td>更新持仓弹窗 · 截图</td><td><code>index.html:903</code></td><td>已存在，决定降级到什么程度</td><td><span class="tag-mod">改动</span></td></tr>
+        <tr><td><b>E4</b></td><td>录入后补数据的中间态</td><td><code>importer.js</code> commit 之后</td><td>解决「录进去显示 0 元」，含架构变更</td><td><span class="tag-new">新增</span></td></tr>
+        <tr><td><b>E5</b></td><td>持仓表空行提示</td><td><code>app.js</code> renderHoldingsTable</td><td>表格无数据时的一行说明</td><td><span class="tag-new">新增</span></td></tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- ===== ④ 帧 + 内联决策卡 ===== -->
+  <section>
+    <h2 class="sec">三、新用户第一屏（E0 现状 → E1 三方案）</h2>
+
+    <div class="row">
+      <div class="wcol">
+        <div class="cap"><span class="no">E0</span>现状 · 全新安装打开首页<span class="tag-keep">现状</span></div>
+        <div class="capsub">照着真实截图画的，不是想象</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="top"><span>基金投资决策助手 <span class="v">v2.1.0</span></span><span class="btn" style="padding:3px 9px;font-size:10px">更新净值</span></div>
+          <div class="tabs"><b>总览</b><span>风险分析</span><span>调仓建议</span><span>策略回测</span><span>持仓透视</span><span>选基</span></div>
+          <div class="body">
+            <div class="kpis">
+              <div class="kpi"><div class="l">总资产</div><div class="v zero">0.00</div></div>
+              <div class="kpi"><div class="l">持有收益</div><div class="v zero">+0.00</div></div>
+              <div class="kpi"><div class="l">昨日收益</div><div class="v zero">+0.00</div></div>
+              <div class="kpi"><div class="l">持有基金数</div><div class="v zero">0</div></div>
+            </div>
+            <div class="panelbox">
+              <div style="font-size:11px;font-weight:800;margin-bottom:4px">资产配置</div>
+              <div class="donut-empty"></div>
+            </div>
+            <div class="note-in-frame">↓ 首屏之下才有「更新持仓」按钮；持仓表只有表头，无任何提示文字</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wcol">
+        <div class="cap"><span class="no">E1-甲</span>方案甲 · 顶部引导条<span class="tag-new">新增</span></div>
+        <div class="capsub">最轻：加一条横幅，其余保持不变</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="top"><span>基金投资决策助手 <span class="v">v2.1.0</span></span><span class="btn" style="padding:3px 9px;font-size:10px">更新净值</span></div>
+          <div class="tabs"><b>总览</b><span>风险分析</span><span>调仓建议</span><span>策略回测</span><span>持仓透视</span><span>选基</span></div>
+          <div class="body">
+            <div class="panelbox" style="border-color:var(--app);background:var(--app-soft);display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px">
+              <div style="font-size:11.5px;line-height:1.7"><b style="color:var(--ink)">还没有持仓数据</b><br>
+                <span style="color:var(--ink-2)">按代码逐只录入，30 秒就能看到全部分析</span></div>
+              <span class="btn pri">开始录入</span>
+            </div>
+            <div class="kpis">
+              <div class="kpi"><div class="l">总资产</div><div class="v zero">0.00</div></div>
+              <div class="kpi"><div class="l">持有收益</div><div class="v zero">+0.00</div></div>
+              <div class="kpi"><div class="l">昨日收益</div><div class="v zero">+0.00</div></div>
+              <div class="kpi"><div class="l">持有基金数</div><div class="v zero">0</div></div>
+            </div>
+            <div class="panelbox"><div style="font-size:11px;font-weight:800;margin-bottom:4px">资产配置</div><div class="donut-empty"></div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wcol">
+        <div class="cap"><span class="no">E1-乙</span>方案乙 · 空态接管内容区<span class="tag-new">新增</span></div>
+        <div class="capsub">持仓为 0 时，图表区整体换成引导；有数据后恢复原样</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="top"><span>基金投资决策助手 <span class="v">v2.1.0</span></span><span class="btn" style="padding:3px 9px;font-size:10px">更新净值</span></div>
+          <div class="tabs"><b>总览</b><span>风险分析</span><span>调仓建议</span><span>策略回测</span><span>持仓透视</span><span>选基</span></div>
+          <div class="body">
+            <div class="panelbox emptybox">
+              <div style="width:44px;height:44px;border-radius:11px;background:var(--app-soft);margin:0 auto 10px;border:1.5px dashed var(--app)"></div>
+              <div class="big">先把你的持仓抄进来</div>
+              <div class="small">打开支付宝 → 基金 → 持有页面，<br>照着「基金代码 / 持有金额 / 持有收益」逐只填</div>
+              <div><span class="btn pri lg">开始录入持仓</span></div>
+              <div style="margin-top:9px"><span class="btn ghost">用支付宝截图识别（试验功能）</span></div>
+            </div>
+            <div class="note-in-frame">四个 0 的 KPI 卡与灰甜甜圈在空态下<b>不渲染</b> —— 没数据的图表只会让人困惑</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wcol">
+        <div class="cap"><span class="no">E1-丙</span>方案丙 · 首启自动弹录入窗<span class="tag-new">新增</span></div>
+        <div class="capsub">最强推动力，也最容易招人烦</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="top"><span>基金投资决策助手 <span class="v">v2.1.0</span></span><span class="btn" style="padding:3px 9px;font-size:10px">更新净值</span></div>
+          <div class="body" style="position:relative;background:#e8ecf2">
+            <div class="modal-mock">
+              <div style="font-size:12.5px;font-weight:800;margin-bottom:3px">欢迎使用 sanhu</div>
+              <div style="font-size:11px;color:var(--ink-2);line-height:1.75;margin-bottom:10px">先录入你的持仓，才能看到收益、风险和调仓建议。</div>
+              <div class="rowline">
+                <span class="inp">基金代码</span><span class="inp">持有金额</span><span class="inp">持有收益（可选）</span><span class="btn pri">＋ 添加</span>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:11px">
+                <span class="btn ghost" style="font-size:10.5px">以后再说</span>
+                <span class="btn pri">确认更新</span>
+              </div>
+            </div>
+            <div class="note-in-frame">只在「一条持仓都没有」时弹一次；点「以后再说」后本次安装不再自动弹</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Q1 ===== -->
+    <div class="dq" id="Q1" data-q="Q1" data-title="空态引导用哪个形态">
+      <div class="dq-hd"><span class="dq-id">Q1</span><span class="dq-state">待你决策</span><span class="tag-keep">已确认并落地 · dc51f24</span></div>
+      <div class="dq-q">新用户打开是一片 0，引导做成哪种形态？</div>
+      <div class="dq-sub">三个方案的差别是<b>打扰程度</b>：横幅最轻但容易被忽略，接管内容区把「没数据」这件事说清楚，自动弹窗转化最高但有被当成弹窗广告的风险。<b>不做的代价</b>：新用户看到四个 0 和一个灰圈，不知道下一步该干什么，大概率直接关掉。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q1" value="乙 · 空态接管内容区">
+          <span class="o-body">
+            <span class="o-t">乙 · 空态接管内容区<span class="rec-chip">我建议</span><span class="cost-chip">前端 ~0.5 天</span></span>
+            <span class="o-d">持仓为 0 时不渲染空图表，整块换成引导卡；一有数据立刻恢复原样。既解释了「为什么是空的」，又不打断已有用户。截图入口降为下方文字链，顺带把 Q4 一起解决。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q1" value="甲 · 顶部引导条">
+          <span class="o-body">
+            <span class="o-t">甲 · 顶部引导条<span class="cost-chip">前端 ~2 小时</span></span>
+            <span class="o-d">改动最小，加一条横幅即可。代价是四个 0 和灰甜甜圈仍在，页面依旧显得「坏了」。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q1" value="丙 · 首启自动弹窗">
+          <span class="o-body">
+            <span class="o-t">丙 · 首启自动弹窗<span class="cost-chip">前端 ~0.5 天</span></span>
+            <span class="o-d">转化最高。风险：用户还没看清这是什么工具就被要求填表；且需要记「已关闭过」的状态（存 localStorage 还是 user_settings 要一并定）。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q1" value="乙 + 丙 组合">
+          <span class="o-body">
+            <span class="o-t">乙 + 丙 组合<span class="cost-chip">前端 ~1 天</span></span>
+            <span class="o-d">空态接管 + 首启弹一次。转化最高且关掉弹窗后仍有引导兜底，但两套 UI 都要维护。</span>
+          </span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder="比如：文案想改成什么口气"></textarea></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">四、录进去却显示 0 元（E4 · 本稿最关键的一处）</h2>
+
+    <div class="card warn">
+      这不是 UI 问题，是<b>数据补齐时机</b>没定。用户录入的是「代码 + 金额」，
+      但系统要算市值必须有<b>净值</b>，要分类必须有<b>fund_type</b> —— 这两样都得去东财抓。
+      现在一次都没抓，直接落库，于是市值为 0。<br>
+      抓一只基金的档案 + 近 3 年净值，实测约 <b>1～3 秒</b>；录 8 只就是 <b>10～25 秒</b>。这段时间怎么处理，是下面这道题。
+    </div>
+
+    <div class="row">
+      <div class="wcol">
+        <div class="cap"><span class="no">E4-甲</span>方案甲 · 提交时同步抓，转圈等<span class="tag-new">新增</span></div>
+        <div class="capsub">等完再关弹窗，看到的第一眼就是对的</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="body" style="background:#e8ecf2">
+            <div class="modal-mock">
+              <div style="font-size:12.5px;font-weight:800;margin-bottom:9px">正在获取基金数据…</div>
+              <div class="minitab">
+                <div class="h"><div>基金</div><div style="flex:.6">状态</div></div>
+                <div class="r"><div>014248 兴业一年持有债券A</div><div style="flex:.6;color:var(--loss)">✓ 完成</div></div>
+                <div class="r"><div>006195 国金量化多因子股票A</div><div style="flex:.6"><span class="badge-load">抓取中</span></div></div>
+                <div class="r"><div>110022</div><div style="flex:.6;color:var(--muted)">排队中</div></div>
+              </div>
+              <div class="note-in-frame">3 / 8 · 预计还需 12 秒　　<span class="btn ghost" style="font-size:10px">转后台继续</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wcol">
+        <div class="cap"><span class="no">E4-乙</span>方案乙 · 先落库，后台补，列表标占位<span class="tag-new">新增</span></div>
+        <div class="capsub">立刻看到列表，数据陆续填上</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="tabs"><b>总览</b><span>风险分析</span><span>调仓建议</span></div>
+          <div class="body">
+            <div class="kpis" style="grid-template-columns:repeat(2,1fr)">
+              <div class="kpi"><div class="l">总资产</div><div class="v">21.5 万 <span class="badge-load">补数据中</span></div></div>
+              <div class="kpi"><div class="l">持有基金数</div><div class="v">8</div></div>
+            </div>
+            <div class="minitab">
+              <div class="h"><div>基金名称</div><div style="flex:.5">持有金额</div><div style="flex:.5">收益率</div></div>
+              <div class="r"><div>兴业一年持有债券A</div><div style="flex:.5">153,368</div><div style="flex:.5;color:var(--profit)">+2.25%</div></div>
+              <div class="r"><div>110022 <span class="badge-load">获取中</span></div><div style="flex:.5">50,000</div><div style="flex:.5;color:var(--muted)">—</div></div>
+            </div>
+            <div class="note-in-frame">未补齐的行显示用户填的<b>金额</b>而不是 0，收益率留「—」，绝不显示 0.00</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wcol">
+        <div class="cap"><span class="no">E4-丙</span>方案丙 · 录入时就校验，抓不到不让提交<span class="tag-new">新增</span></div>
+        <div class="capsub">在「＋ 添加」那一步就把基金查出来</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="body" style="background:#e8ecf2">
+            <div class="modal-mock">
+              <div class="mtabs"><span class="on">✏️ 手动输入</span><span>📷 支付宝截图</span></div>
+              <div class="rowline">
+                <span class="inp" style="flex:1.2">110022</span><span class="inp">50000</span><span class="inp">3000</span><span class="btn pri">＋ 添加</span>
+              </div>
+              <div style="font-size:10.5px;color:var(--app);margin-bottom:8px">✓ 易方达消费行业混合 · 混合型-偏股 · 最新净值 3.8420（06-30）</div>
+              <div class="minitab">
+                <div class="h"><div>代码</div><div>名称</div><div style="flex:.6">金额</div></div>
+                <div class="r"><div>014248</div><div>兴业一年持有债券A</div><div style="flex:.6">150,000</div></div>
+              </div>
+              <div class="note-in-frame">代码填错、或东财查不到 → 直接红字拦在这一步，不进列表</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Q2 ===== -->
+    <div class="dq" id="Q2" data-q="Q2" data-title="录入后何时抓基金数据">
+      <div class="dq-hd"><span class="dq-id">Q2</span><span class="dq-state">待你决策</span><span class="tag-keep">已确认并落地 · dc51f24</span></div>
+      <div class="dq-q">录入后什么时候去抓这只基金的档案和净值？</div>
+      <div class="dq-sub">
+        <b>架构变更提醒：</b>三个方案都要在 <code>ImportCommit</code> 里新增一次对东财的抓取调用（现在完全没有）。
+        甲/丙 会让接口从「毫秒级」变成「秒级」；乙 需要一个后台任务队列和一个查询进度的接口。
+        <b>不做的代价</b>：录入功能等于半残 —— 用户录 8 只，能正常显示的可能只有 1～2 只。
+      </div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q2" value="丙 · 添加时即时校验 + 提交时补净值">
+          <span class="o-body">
+            <span class="o-t">丙 · 添加时即时校验<span class="rec-chip">我建议</span><span class="cost-chip">后端 ~1 天</span></span>
+            <span class="o-d">在「＋ 添加」时就查一次基金档案（1 只 ≈ 1 秒，用户感知是「填完自动带出名称」，很自然），确认存在才进暂存列表；提交时再补净值历史。<b>好处</b>：错代码当场拦住，不会录进一个查无此基金的东西；等待被摊薄到每一次输入，没有集中的长时间转圈。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q2" value="甲 · 提交时同步抓，带进度">
+          <span class="o-body">
+            <span class="o-t">甲 · 提交时同步抓<span class="cost-chip">后端 ~0.5 天</span></span>
+            <span class="o-d">实现最直接，关掉弹窗看到的就是完整数据。代价是 8 只要等 10～25 秒，中途网络出错要能重试；且这段时间用户只能干等。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q2" value="乙 · 先落库后台补 + 占位态">
+          <span class="o-body">
+            <span class="o-t">乙 · 先落库后台补<span class="cost-chip">后端 ~2 天</span></span>
+            <span class="o-d">体感最快，立刻见列表。但要新增后台队列 + 进度接口 + 前端轮询，还要处理「补失败了怎么办」；且未补齐期间总资产是不准的，得全程标注。</span>
+          </span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+
+    <!-- ===== Q3 ===== -->
+    <div class="dq" id="Q3" data-q="Q3" data-title="净值缺失时市值怎么显示">
+      <div class="dq-hd"><span class="dq-id">Q3</span><span class="dq-state">待你决策</span><span class="tag-keep">已确认并落地 · dc51f24</span></div>
+      <div class="dq-q">万一净值实在抓不到（新基金 / 东财没数据），那只基金怎么显示？</div>
+      <div class="dq-sub">现在是<b>市值 0 元、净值 4.7 亿</b>，两个数都是错的，且没有任何提示。这道题决定兜底口径。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q3" value="用用户填的金额当市值，标注「未更新」">
+          <span class="o-body">
+            <span class="o-t">用用户填的金额当市值，标注「未更新」<span class="rec-chip">我建议</span></span>
+            <span class="o-d">用户填了 5 万就显示 5 万，收益率显示「—」，行尾挂一个「净值未更新」小标。总资产至少是对的量级，不会出现「我明明有 20 万却显示 0」。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q3" value="显示 0 但整行置灰 + 明确报错">
+          <span class="o-body">
+            <span class="o-t">显示 0 但整行置灰 + 明确报错</span>
+            <span class="o-d">诚实但难看：明确告诉用户「这只没拿到数据，不计入统计」。好处是不会让人误以为数据是准的。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q3" value="干脆不允许录入，提示换一只">
+          <span class="o-body">
+            <span class="o-t">干脆不允许录入，提示换一只</span>
+            <span class="o-d">最简单，但用户真持有这只基金却录不进来，会觉得工具不好使。</span>
+          </span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">五、手动表单字段 与 截图入口（E2 / E3）</h2>
+
+    <div class="row">
+      <div class="wcol">
+        <div class="cap"><span class="no">E2</span>手动录入 · 现状<span class="tag-keep">现状</span></div>
+        <div class="capsub">三个字段，一行一只，加进暂存列表后统一提交</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="body" style="background:#e8ecf2">
+            <div class="modal-mock">
+              <div class="mtabs"><span class="on">✏️ 手动输入</span><span>📷 支付宝截图</span></div>
+              <div style="font-size:10.5px;color:var(--ink-2);line-height:1.7;margin-bottom:9px">逐条填写后加入列表，全部填完后点「确认更新」，将更新列表中的持仓，列表外的不受影响。</div>
+              <div class="rowline">
+                <span class="inp" style="flex:1.2">基金代码（如 510300）</span><span class="inp">持有金额（元）</span><span class="inp">持有收益（元，可选）</span><span class="btn pri">＋ 添加</span>
+              </div>
+              <div class="minitab">
+                <div class="h"><div>代码</div><div>名称</div><div style="flex:.6">持有金额</div><div style="flex:.6">持有收益</div></div>
+                <div class="r"><div>014248</div><div>兴业一年持有债券A</div><div style="flex:.6">150,000</div><div style="flex:.6">3,368</div></div>
+              </div>
+              <div style="display:flex;justify-content:flex-end;gap:7px;margin-top:10px"><span class="btn">取消</span><span class="btn pri">确认更新</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:10px;font-size:12.5px">
+          <b>字段口径是对的，不建议动。</b>支付宝持有页上直接能看到的就是「持有金额」和「持有收益」，
+          让用户抄这两个数最省事。份额和成本由后端反推：<code>成本 = 金额 − 收益</code>、<code>份额 = 金额 ÷ 最新净值</code>。
+        </div>
+      </div>
+
+      <div class="wcol">
+        <div class="cap"><span class="no">E3-甲</span>截图导入 · 保持同级 Tab<span class="tag-keep">现状</span></div>
+        <div class="capsub">仅默认选中手动（现在就是这样）</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="body" style="background:#e8ecf2">
+            <div class="modal-mock">
+              <div class="mtabs"><span class="on">✏️ 手动输入</span><span>📷 支付宝截图</span></div>
+              <div style="height:96px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:11px;border:1px dashed var(--line);border-radius:8px">两个 Tab 视觉等重</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wcol">
+        <div class="cap"><span class="no">E3-乙</span>截图导入 · 降为次要入口<span class="tag-mod">改动</span></div>
+        <div class="capsub">手动是主体，截图收到底部一行文字链</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="body" style="background:#e8ecf2">
+            <div class="modal-mock">
+              <div style="font-size:12.5px;font-weight:800;margin-bottom:9px">更新持仓</div>
+              <div class="rowline">
+                <span class="inp" style="flex:1.2">基金代码</span><span class="inp">持有金额</span><span class="inp">持有收益（可选）</span><span class="btn pri">＋ 添加</span>
+              </div>
+              <div style="height:52px;border:1px dashed var(--line);border-radius:8px"></div>
+              <div style="border-top:1px solid var(--line);margin-top:11px;padding-top:9px;text-align:center">
+                <span class="btn ghost" style="font-size:10.5px">或用支付宝截图识别（试验功能，可能识别不准）</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card warn" style="margin-top:10px;font-size:12.5px">
+          <b>降级的实质理由：</b>OCR 用的是 OCR.space 的免费额度，
+          且 key 是<b>写死在代码里的共享 key</b>（<code>59f247a</code> 把配置 UI 移除了）。
+          额度打爆或 key 失效时，所有用户的截图导入同时失效，而我们没有任何降级提示。
+          把它标成「试验功能」不是嫌弃它，是<b>诚实标注它的可靠性</b>。
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Q4 ===== -->
+    <div class="dq" id="Q4" data-q="Q4" data-title="截图导入降到什么程度">
+      <div class="dq-hd"><span class="dq-id">Q4</span><span class="dq-state">待你决策</span><span class="tag-mod">已确认 · 待 Q6/Q7 定完再落地</span></div>
+      <div class="dq-q">截图导入降级到什么程度？</div>
+      <div class="dq-sub">你说的「推荐手动录入」有多种落地强度。注意<b>已有用户</b>：现在能用截图的人，突然找不到入口会困惑。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q4" value="乙 · 降为底部文字链 + 标注试验功能">
+          <span class="o-body">
+            <span class="o-t">乙 · 降为底部文字链，标「试验功能」<span class="rec-chip">我建议</span><span class="cost-chip">前端 ~2 小时</span></span>
+            <span class="o-d">手动成为弹窗主体，截图收进底部一行链接。既表达了推荐倾向，又没有真的拿走能力；「试验功能」四个字把共享 key 的风险如实说明。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q4" value="甲 · 维持同级 Tab，不改">
+          <span class="o-body">
+            <span class="o-t">甲 · 维持现状<span class="cost-chip">零改动</span></span>
+            <span class="o-d">手动已经是默认 Tab，可以认为「推荐手动」这件事已经完成了。代价是两者视觉等重，推荐意味很弱。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q4" value="丙 · 移入设置页">
+          <span class="o-body">
+            <span class="o-t">丙 · 移进设置页<span class="cost-chip">前端 ~0.5 天</span></span>
+            <span class="o-d">录入弹窗彻底干净。代价是老用户基本找不到了，等于事实上的下线。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q4" value="丁 · 直接移除截图导入">
+          <span class="o-body">
+            <span class="o-t">丁 · 直接移除<span class="cost-chip">可删约 300 行前后端</span></span>
+            <span class="o-d">最干净，不用再维护 OCR 解析和那个共享 key。代价是这个功能是有人在用的卖点之一（README 里「30 秒搞定」讲的就是它）。</span>
+          </span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+
+    <!-- ===== Q5 ===== -->
+    <div class="dq" id="Q5" data-q="Q5" data-title="README 的截图导入章节怎么改">
+      <div class="dq-hd"><span class="dq-id">Q5</span><span class="dq-state">待你决策</span><span class="tag-keep">已确认并落地 · b8aac72</span></div>
+      <div class="dq-q">README 里「截图导入持仓（30秒搞定）」那一节怎么处理？</div>
+      <div class="dq-sub">这节现在排在很靠前的位置，是项目对外的第一印象之一。产品内降级了，对外说法要跟着一致，否则用户照着 README 找不到那个 Tab。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q5" value="改写为「录入持仓」，手动为主截图为辅">
+          <span class="o-body">
+            <span class="o-t">改写为「录入持仓」，手动为主<span class="rec-chip">我建议</span></span>
+            <span class="o-d">章节标题改成中性的「录入持仓」，先讲手动（含代码怎么找），再用一小段说明截图识别是试验功能。对外对内一致。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q5" value="保留原章节，仅加一句试验功能说明">
+          <span class="o-body">
+            <span class="o-t">保留原章节，加一句说明<span class="cost-chip">改动最小</span></span>
+            <span class="o-d">保住「30 秒搞定」这个卖点，只补一句可靠性提示。代价是与产品内的降级不完全一致。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q5" value="整节删除">
+          <span class="o-body">
+            <span class="o-t">整节删除</span>
+            <span class="o-d">与 Q4 选「丁 · 移除」配套。单独选它会让 README 显得少了一块能力介绍。</span>
+          </span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+  </section>
+
+  <!-- ===== ⑤ 产品逻辑流程图 ===== -->
+  <section>
+    <h2 class="sec">六、产品逻辑流程（标出现在断在哪）</h2>
+    <div class="card">
+      <div class="flow"><b>【现状】</b>
+用户打开 → 空首页（<span class="bad">无引导</span>）→ 自己找到「更新持仓」→ 填代码+金额 → 确认
+                                                              │
+                                                              ▼
+                                          ImportCommit：<span class="bad">只写 funds(code,name)，不抓任何数据</span>
+                                                              │
+                                     ┌────────────────────────┴────────────────────────┐
+                                     ▼                                                 ▼
+                        基金在内置的 11 只里                                  <span class="bad">基金不在内置数据里（九成情况）</span>
+                        有净值 → 份额算得出                                  <span class="bad">无净值 → 份额=0 → 市值=0</span>
+                        显示正常                                             <span class="bad">名称显示成代码、净值 4.7 亿、总资产 0</span>
+
+<b>【目标】</b>
+用户打开 → <b>E1 空态引导</b> → 点「开始录入」→ 填代码
+                                                │
+                                                ▼
+                                    <b>Q2</b> 决定的抓取时机（校验/同步/后台）
+                                                │
+                                                ▼
+                                    档案 + 净值入库 → 份额算得出 → 显示正常
+                                                │
+                                                ▼
+                                    抓不到时走 <b>Q3</b> 的兜底口径（不再显示 0）</div>
+    </div>
+    <div class="card" style="margin-top:12px">
+      <b>涉及的架构变更（Gate 要求必须点明）：</b><br>
+      ① <code>ImportCommit</code> 新增对外抓取调用 —— 接口耗时从毫秒级变秒级，需要考虑超时与失败提示；<br>
+      ② 若选 Q2-乙，需<b>新增后台任务队列 + 进度查询接口</b>（比照现有 <code>/api/holdings/refresh/status</code> 的做法）；<br>
+      ③ 若选 Q1-丙，需要持久化「已关闭过引导」状态 —— 存 localStorage（换浏览器会重弹）还是
+      <code>user_settings</code> 表（跟着数据库走）需一并确认；<br>
+      ④ <b>不新增数据表</b>，不改动 holdings 表结构。
+    </div>
+  </section>
+
+  <!-- ===== ⑥ 分享设计 ===== -->
+  <section>
+    <h2 class="sec">七、分享设计</h2>
+    <div class="card">
+      <b>本稿不涉及分享。</b>理由：sanhu 是<b>本地运行的桌面 Web 工具</b>（localhost），不是微信小程序，
+      没有分享卡片这一层；且本轮改的是录入流程，涉及用户真实持仓金额，
+      <b>本就不应该有任何对外分享入口</b>。<br>
+      这里明确写出来，是为了把「漏写」和「刻意不做」区分开。
+    </div>
+  </section>
+
+  <!-- ===== ⑦ 图片素材需求 ===== -->
+  <section>
+    <h2 class="sec">八、图片素材需求</h2>
+    <div class="card">
+      <b>本轮不需要出图，全部用 CSS 画。</b><br>
+      空态引导里的那个图形（E1-乙 中的圆角虚线方块）用 CSS 画一个占位框即可 ——
+      与现有前端风格（纯 CSS + ECharts，无图片资源）保持一致，也避免给单文件二进制再塞图片资源。<br>
+      <b>确认后如果你想要一个空态插画</b>，再单开规格：尺寸 240×180、PNG 透明底、
+      风格与主色 <code>#5b5bd6</code> 协调；<b>不画任何基金公司 / 支付宝的 logo 或界面截图</b>，避免侵权。
+    </div>
+  </section>
+
+  <!-- ===== 设置页（Q4 选了「移入设置页」，但这个页面还不存在）===== -->
+  <section>
+    <h2 class="sec">九、设置页（Q4 的前置条件）</h2>
+
+    <div class="card warn">
+      <b>Q4 选了「丙 · 移进设置页」，但这个页面不存在。</b><br>
+      <code>/api/settings</code> 接口有（GET + PATCH），<code>api.js</code> 里 <code>getSettings</code>/<code>patchSettings</code>
+      也写好了，但<b>全项目零调用</b> —— index.html 里没有任何设置界面。
+      所以 Q4 不是「挪一个 Tab」，是「先造一个页面，再把截图导入放进去」。<br>
+      下面两帧是这个新页面的方案，定完再动手。
+    </div>
+
+    <div class="row">
+      <div class="wcol">
+        <div class="cap"><span class="no">S1-甲</span>入口 · 顶栏齿轮 + 抽屉<span class="tag-new">新增</span></div>
+        <div class="capsub">不占 Tab 位；设置是低频操作</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="top"><span>基金投资决策助手 <span class="v">v2.2.0</span></span><span><span class="btn" style="padding:3px 9px;font-size:10px">更新净值</span> <span class="btn" style="padding:3px 8px;font-size:10px">⚙</span></span></div>
+          <div class="tabs"><b>总览</b><span>风险分析</span><span>调仓建议</span><span>策略回测</span><span>持仓透视</span><span>选基</span></div>
+          <div class="body" style="background:#e8ecf2">
+            <div class="modal-mock" style="max-width:330px;margin-left:auto">
+              <div style="font-size:12.5px;font-weight:800;margin-bottom:10px">设置</div>
+              <div style="font-size:10.5px;color:var(--muted);font-weight:800;margin-bottom:5px">数据录入</div>
+              <div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:11px;margin-bottom:11px">
+                📷 支付宝截图识别 <span style="background:#fff4e2;color:#a8720f;border-radius:4px;padding:0 5px;font-size:9px">试验</span>
+              </div>
+              <div style="font-size:10.5px;color:var(--muted);font-weight:800;margin-bottom:5px">风险偏好</div>
+              <div class="rowline"><span class="inp" style="flex:1">稳健型 ▾</span></div>
+              <div style="font-size:10.5px;color:var(--muted);font-weight:800;margin:9px 0 5px">关于</div>
+              <div style="font-size:10.5px;color:var(--ink-2);line-height:1.8">版本 v2.2.0 · <span style="color:var(--app)">检查更新</span><br>数据目录：<code style="font-size:9px">./data</code></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wcol">
+        <div class="cap"><span class="no">S1-乙</span>入口 · 顶部导航加一个「设置」Tab<span class="tag-new">新增</span></div>
+        <div class="capsub">与现有 8 个 Tab 并列，最容易找到</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="top"><span>基金投资决策助手 <span class="v">v2.2.0</span></span><span class="btn" style="padding:3px 9px;font-size:10px">更新净值</span></div>
+          <div class="tabs"><span>总览</span><span>风险分析</span><span>调仓建议</span><span>策略回测</span><span>持仓透视</span><span>选基</span><span>决策</span><b>设置</b></div>
+          <div class="body">
+            <div class="panelbox" style="margin-bottom:9px">
+              <div style="font-size:11.5px;font-weight:800;margin-bottom:7px">数据录入</div>
+              <div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;color:var(--ink-2)">
+                <span>支付宝截图识别 <span style="background:#fff4e2;color:#a8720f;border-radius:4px;padding:0 5px;font-size:9px">试验功能</span><br>
+                  <span style="font-size:10px;color:var(--muted)">上传持仓截图自动识别，结果需人工核对</span></span>
+                <span class="btn">打开</span>
+              </div>
+            </div>
+            <div class="panelbox" style="margin-bottom:9px">
+              <div style="font-size:11.5px;font-weight:800;margin-bottom:7px">风险偏好</div>
+              <div style="font-size:11px;color:var(--ink-2)">影响调仓建议与仓位测算　<span class="inp">稳健型 ▾</span></div>
+            </div>
+            <div class="panelbox">
+              <div style="font-size:11.5px;font-weight:800;margin-bottom:7px">关于</div>
+              <div style="font-size:11px;color:var(--ink-2);line-height:1.9">当前版本 v2.2.0　<span style="color:var(--app)">检查更新</span><br>
+                数据目录 <code style="font-size:10px">./data</code>（备份直接拷这个目录）</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== Q6 ===== -->
+    <div class="dq" id="Q6" data-q="Q6" data-title="设置页入口做成什么形态">
+      <div class="dq-hd"><span class="dq-id">Q6</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">设置页的入口放哪？</div>
+      <div class="dq-sub">现在顶部已经有 8 个 Tab（总览/风险分析/调仓建议/策略回测/持仓透视/选基/决策/模拟盘），再加一个会有点挤；但齿轮图标对不熟悉的用户来说不够显眼。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q6" value="甲 · 顶栏齿轮 + 右侧抽屉">
+          <span class="o-body">
+            <span class="o-t">甲 · 顶栏齿轮 + 右侧抽屉<span class="rec-chip">我建议</span><span class="cost-chip">前端 ~0.5 天</span></span>
+            <span class="o-d">设置是低频操作，不值得占一个主 Tab；齿轮放在「更新净值」旁边，位置符合习惯。抽屉不打断当前页面。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q6" value="乙 · 顶部加一个「设置」Tab">
+          <span class="o-body">
+            <span class="o-t">乙 · 顶部加「设置」Tab<span class="cost-chip">前端 ~0.5 天</span></span>
+            <span class="o-d">与现有导航一致，最容易被发现，实现也最省事（复用现有 Tab 机制）。代价是导航从 8 个变 9 个，窄屏会换行。</span>
+          </span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+
+    <!-- ===== Q7 ===== -->
+    <div class="dq" id="Q7" data-q="Q7" data-title="设置页首版放哪些内容">
+      <div class="dq-hd"><span class="dq-id">Q7</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">设置页首版放哪些东西？</div>
+      <div class="dq-sub">为 Q4 造这个页面，顺手能收拢几个现在没处放的东西。<b>放多了</b>会拖慢这次改动；<b>放少了</b>则一个页面只装一个「试验功能」入口，显得空。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q7" value="截图导入 + 风险偏好 + 关于（版本/更新/数据目录）">
+          <span class="o-body">
+            <span class="o-t">截图导入 + 风险偏好 + 关于<span class="rec-chip">我建议</span><span class="cost-chip">前端 ~1 天</span></span>
+            <span class="o-d">三块都是现成能力，只差界面：<code>risk_level</code> 已存在 user_settings 却<b>没有任何界面可改</b>；版本/检查更新接口齐备；数据目录现在只在启动日志里出现，用户想备份找不到。页面内容饱满，不需要新增后端。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q7" value="只放截图导入，其余以后再说">
+          <span class="o-body">
+            <span class="o-t">只放截图导入<span class="cost-chip">前端 ~0.5 天</span></span>
+            <span class="o-d">改动最小、最快落地。代价是一个设置页里只有一个「试验功能」入口，用户点进去会觉得莫名其妙。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q7" value="截图导入 + 风险偏好 + 关于 + 定时任务开关">
+          <span class="o-body">
+            <span class="o-t">再加定时任务开关<span class="cost-chip">前端 ~1 天 + 后端 ~1 天</span></span>
+            <span class="o-d">让用户能关掉那 8 个每日定时任务（有人不希望程序后台自动联网）。需要新增开关的持久化与调度器的动态启停，后端改动最大。</span>
+          </span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+  </section>
+
+  <!-- ===== ⑧ 决策汇总 + 提交区 ===== -->
+  <section>
+    <h2 class="sec">十、决策汇总与提交</h2>
+    <div class="card">
+      <div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:4px">你的决策汇总</div>
+      <div style="font-size:12.5px;margin-bottom:14px">随上面的作答实时更新。<b>没答完也能复制</b> —— 未决策的会标成「未答」。</div>
+      <div id="sumList"></div>
+
+      <div style="font-size:13px;font-weight:800;color:var(--ink);margin:18px 0 0">粘给 Claude 的内容</div>
+      <textarea class="dq-out" id="dqOut" readonly></textarea>
+      <div style="display:flex;gap:10px;margin-top:11px;flex-wrap:wrap">
+        <button class="primary" id="btnCopyBottom" style="font-size:13.5px;font-weight:800;padding:10px 22px;border-radius:22px;border:1px solid var(--primary-deep);background:var(--primary-deep);color:#fff;cursor:pointer">复制答案</button>
+        <button id="btnNext2" style="font-size:13px;font-weight:700;padding:10px 18px;border-radius:22px;border:1px solid #c6d6e2;background:#fff;color:var(--ink-2);cursor:pointer">回到第一个未答 ↑</button>
+      </div>
+      <div class="copy-hint">复制后直接粘进聊天框发我即可。答案存在你本地浏览器，关掉页面不会丢。</div>
+    </div>
+
+    <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.9">
+      Gate（全绿才动代码）：所有帧编号+状态已定 · Qx 全绿 · 流程图齐 · 强视觉项出图规格齐 · <b>架构变更（ImportCommit 新增抓取 / 可能的后台队列 / 引导关闭状态存哪）已在第六节点明并被确认</b>。
+    </div>
+  </section>
+
+  <div class="toast" id="toast">已复制</div>
+</div>
+
+<!-- ============================================================================
+     决策卡引擎（零配置，勿改）
+     ============================================================================ -->
+<script>
+(function(){
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.dq'));
+  if (!cards.length) return;
+
+  var slug = (location.pathname.split('/').pop() || 'product-spec').replace(/\.html?$/i,'');
+  var KEY = 'dq::' + slug;
+
+  var titleOf = {};
+  cards.forEach(function(c){
+    titleOf[c.getAttribute('data-q')] = c.getAttribute('data-title') || c.getAttribute('data-q');
+  });
+
+  var byNum = cards.map(function(c){ return c.getAttribute('data-q'); })
+                   .sort(function(a,b){ return (+a.replace(/\D/g,'')) - (+b.replace(/\D/g,'')); });
+  var byDom = cards.map(function(c){ return c.getAttribute('data-q'); });
+
+  var state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e) { state = {}; }
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){} }
+  function get(id){ return state[id] || { v:'', note:'' }; }
+  function esc(s){ return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+
+  function render(){
+    var done = 0;
+    cards.forEach(function(card){
+      var id = card.getAttribute('data-q'), s = get(id), ok = !!s.v;
+      if (ok) done++;
+      card.classList.toggle('answered', ok);
+      card.querySelector('.dq-state').textContent = ok ? ('已定：' + s.v) : '待你决策';
+      card.querySelectorAll('.dq-opt').forEach(function(opt){
+        var r = opt.querySelector('input');
+        r.checked = (r.value === s.v);
+        opt.classList.toggle('sel', r.checked);
+      });
+      var ta = card.querySelector('.dq-note textarea');
+      if (ta && ta.value !== s.note) ta.value = s.note || '';
+    });
+
+    var pt = document.getElementById('pTxt');
+    pt.innerHTML = '<em>' + done + '</em> / ' + cards.length + ' 已决策';
+    pt.classList.toggle('all-done', done === cards.length);
+    document.getElementById('pFill').style.width = (done / cards.length * 100) + '%';
+
+    var rail = document.getElementById('dqRail');
+    rail.innerHTML = '';
+    byNum.forEach(function(id){
+      var d = document.createElement('div');
+      d.className = 'rdot' + (get(id).v ? ' done' : '');
+      d.textContent = id;
+      d.title = titleOf[id] + (get(id).v ? '：' + get(id).v : '（待决策）');
+      d.onclick = function(){ jumpTo(id); };
+      rail.appendChild(d);
+    });
+
+    document.querySelectorAll('h2.sec').forEach(function(h){
+      var old = h.querySelector('.sec-badge'); if (old) old.remove();
+      var sec = h.closest('section'); if (!sec) return;
+      var inSec = Array.prototype.slice.call(sec.querySelectorAll('.dq'));
+      if (!inSec.length) return;
+      var open = inSec.filter(function(c){ return !get(c.getAttribute('data-q')).v; }).length;
+      var b = document.createElement('span');
+      b.className = 'sec-badge' + (open ? '' : ' done');
+      b.innerHTML = '<i></i>' + (open ? (open + ' 个待你决策') : '本节已决策完');
+      h.appendChild(b);
+    });
+
+    renderSummary(done);
+  }
+
+  function renderSummary(done){
+    var list = document.getElementById('sumList');
+    if (list) {
+      list.innerHTML = '';
+      byNum.forEach(function(id){
+        var s = get(id);
+        var row = document.createElement('div');
+        row.className = 'dqsum-row' + (s.v ? ' done' : '');
+        row.innerHTML = '<div class="s-id">' + id + '</div>' +
+          '<div class="s-q">' + esc(titleOf[id]) + '</div>' +
+          '<div class="s-a">' + (s.v ? esc(s.v) : '未答') +
+          (s.note ? '<span class="s-note">' + esc(s.note) + '</span>' : '') + '</div>';
+        row.onclick = function(){ jumpTo(id); };
+        list.appendChild(row);
+      });
+    }
+    var out = document.getElementById('dqOut');
+    if (!out) return;
+    var title = (document.querySelector('h1') || {}).textContent || slug;
+    var lines = ['【' + title.replace(/【改我】/g,'').trim() + ' · 决策回复】'];
+    var missing = [];
+    byNum.forEach(function(id){
+      var s = get(id);
+      if (s.v) lines.push(id + ' = ' + s.v + (s.note ? '（补充：' + s.note + '）' : ''));
+      else missing.push(id);
+    });
+    if (missing.length) lines.push('', '未答：' + missing.join('、'));
+    lines.push('', '（' + done + '/' + cards.length + ' 已决策）');
+    out.value = lines.join('\n');
+  }
+
+  function jumpTo(id){
+    var el = document.getElementById(id); if (!el) return;
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+    el.style.transition = 'box-shadow .25s';
+    el.style.boxShadow = '0 0 0 4px rgba(233,162,59,.32)';
+    setTimeout(function(){ el.style.boxShadow=''; }, 900);
+  }
+
+  function nextOpen(){
+    var open = byDom.filter(function(id){ return !get(id).v; });
+    if (!open.length) { toast('都答完了，点「复制答案」发我'); return; }
+    var y = window.scrollY + 120;
+    var below = open.filter(function(id){ return document.getElementById(id).offsetTop > y; });
+    jumpTo(below.length ? below[0] : open[0]);
+  }
+
+  cards.forEach(function(card){
+    var id = card.getAttribute('data-q');
+    card.querySelectorAll('.dq-opt input').forEach(function(r){
+      r.addEventListener('change', function(){
+        var s = get(id); s.v = r.value; state[id] = s; save(); render();
+      });
+    });
+    var ta = card.querySelector('.dq-note textarea');
+    if (ta) ta.addEventListener('input', function(){
+      var s = get(id); s.note = ta.value.trim(); state[id] = s; save();
+      renderSummary(byNum.filter(function(x){ return !!get(x).v; }).length);
+    });
+  });
+
+  var tId;
+  function toast(msg){
+    var t = document.getElementById('toast'); if (!t) return;
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(tId); tId = setTimeout(function(){ t.classList.remove('show'); }, 1900);
+  }
+
+  function copyOut(){
+    var ta = document.getElementById('dqOut'); if (!ta) return;
+    function fallback(){
+      ta.removeAttribute('readonly'); ta.select();
+      try { document.execCommand('copy'); toast('已复制，粘给我即可'); }
+      catch(e){ toast('复制失败，请手动全选下方文本'); }
+      ta.setAttribute('readonly','readonly');
+      window.getSelection().removeAllRanges();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(ta.value).then(function(){ toast('已复制，粘给我即可'); }, fallback);
+    } else fallback();
+  }
+
+  function bind(id, fn){ var el = document.getElementById(id); if (el) el.onclick = fn; }
+  bind('btnNext', nextOpen); bind('btnNext2', nextOpen);
+  bind('btnCopyTop', copyOut); bind('btnCopyBottom', copyOut);
+  bind('btnReset', function(){
+    if (!confirm('清空所有已作答的决策？')) return;
+    state = {}; save(); render(); toast('已清空');
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
