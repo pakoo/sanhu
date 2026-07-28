@@ -32,7 +32,7 @@ func TestNewRouterServesIndexAndHealth(t *testing.T) {
 		t.Fatalf("fs.Sub(static): %v", err)
 	}
 
-	router := newRouter(staticFS, false, newTestDB(t))
+	router := newRouter(staticFS, false, newTestDB(t), t.TempDir())
 
 	indexReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	indexResp := httptest.NewRecorder()

@@ -123,8 +123,56 @@ function switchTab(tab) {
     if (tab === 'holdings' && !holdingsData) loadHoldings();
     if (tab === 'rebalance' && !valuationData) loadValuation();
     if (tab === 'simulations' && typeof simInit === 'function') simInit();
+    if (tab === 'settings') loadSettings();
     // 模块使用说明区
     if (typeof initModuleGuide === 'function') initModuleGuide(tab);
+}
+
+// === 设置 Tab ===
+async function loadSettings() {
+    try {
+        const s = await API.getSettings();
+        const sel = document.getElementById('settingsRiskLevel');
+        // 老库里可能存着 conservative / aggressive，映射到下拉框的三个值
+        const alias = { conservative: 'low', aggressive: 'high' };
+        sel.value = alias[s.risk_level] || s.risk_level || 'moderate';
+    } catch (e) {
+        console.error('读取设置失败:', e);
+    }
+    try {
+        const d = await (await fetch('/api/system/version')).json();
+        document.getElementById('settingsVersion').textContent = d.version || '—';
+        document.getElementById('settingsDataDir').textContent = d.data_dir || '—';
+    } catch (e) {
+        console.error('读取版本信息失败:', e);
+    }
+}
+
+async function saveRiskLevel() {
+    const value = document.getElementById('settingsRiskLevel').value;
+    const tip = document.getElementById('settingsRiskSaved');
+    try {
+        await API.patchSettings({ risk_level: value });
+        tip.textContent = '已保存';
+        tip.style.color = '#10b981';
+    } catch (e) {
+        tip.textContent = '保存失败，请重试';
+        tip.style.color = '#ef4444';
+    }
+    tip.style.display = 'block';
+    setTimeout(() => { tip.style.display = 'none'; }, 2200);
+}
+
+// 设置页的「检查更新」复用顶栏那个版本面板
+function openUpdatePanel() {
+    const panel = document.getElementById('updatePanel');
+    const overlay = document.getElementById('upOverlay');
+    const rect = document.getElementById('versionBadge').getBoundingClientRect();
+    panel.style.top = (rect.bottom + 6) + 'px';
+    panel.style.left = rect.left + 'px';
+    panel.style.display = 'block';
+    if (overlay) overlay.style.display = 'block';
+    if (typeof checkForUpdate === 'function') checkForUpdate();
 }
 
 // === 总览内子 Tab（持仓明细 / 关注列表）===

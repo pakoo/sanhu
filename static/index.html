@@ -94,6 +94,7 @@
             <button class="tab-btn" onclick="switchTab('selector')">选基</button>
             <button class="tab-btn" onclick="switchTab('decisions')">决策</button>
             <button class="tab-btn" onclick="switchTab('simulations')">🧪 模拟盘</button>
+            <button class="tab-btn" onclick="switchTab('settings')">设置</button>
         </div>
     </div>
 
@@ -747,6 +748,62 @@
                 </div>
             </div>
         </div>
+
+        <!-- Tab 9: 设置 -->
+        <div class="tab-content" id="tab-settings">
+            <div class="card" style="margin-bottom:16px;">
+                <div class="card-title">数据录入</div>
+                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+                    <div style="flex:1;min-width:260px;">
+                        <div style="font-size:14px;font-weight:600;margin-bottom:4px;">
+                            支付宝截图识别
+                            <span style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;border-radius:5px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:6px;">试验功能</span>
+                        </div>
+                        <div style="font-size:13px;color:var(--text-secondary);line-height:1.8;">
+                            上传支付宝持仓页截图，自动识别基金名称、持有金额、持有收益。<br>
+                            它依赖第三方 OCR 服务的免费额度，额度耗尽或服务变更时会识别失败，识别结果也需要人工核对。
+                            <strong>日常录入建议直接用总览页的「更新持仓」按代码手填</strong>，只有三个数字，更快也更准。
+                        </div>
+                    </div>
+                    <button class="btn" onclick="openScreenshotImport()" style="white-space:nowrap;">打开截图识别</button>
+                </div>
+            </div>
+
+            <div class="card" style="margin-bottom:16px;">
+                <div class="card-title">风险偏好</div>
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+                    <div style="font-size:13px;color:var(--text-secondary);line-height:1.8;flex:1;min-width:260px;">
+                        影响调仓建议的目标仓位、择时建议的分批力度与单只上限。
+                    </div>
+                    <select id="settingsRiskLevel" onchange="saveRiskLevel()"
+                        style="padding:7px 12px;border:1px solid var(--border);border-radius:8px;font-size:13px;min-width:150px;">
+                        <option value="low">保守型</option>
+                        <option value="moderate">稳健型</option>
+                        <option value="high">进取型</option>
+                    </select>
+                </div>
+                <div id="settingsRiskSaved" style="display:none;font-size:12px;color:#10b981;margin-top:8px;">已保存</div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">关于</div>
+                <div style="font-size:13px;line-height:2.1;color:var(--text-secondary);">
+                    <div>
+                        当前版本 <strong id="settingsVersion" style="color:var(--text);">—</strong>
+                        <button class="btn" onclick="openUpdatePanel()" style="font-size:12px;padding:2px 10px;margin-left:8px;">检查更新</button>
+                    </div>
+                    <div>
+                        数据目录
+                        <code id="settingsDataDir" style="background:var(--bg-secondary);padding:2px 7px;border-radius:5px;font-size:12px;">—</code>
+                        <span style="font-size:12px;">（数据库、持仓记录都在这里，备份或换电脑直接拷这个目录）</span>
+                    </div>
+                    <div>
+                        项目主页
+                        <a href="https://github.com/pakoo/sanhu" target="_blank" rel="noopener" style="color:var(--primary);">github.com/pakoo/sanhu</a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- 交易记录模态框 -->
@@ -859,17 +916,8 @@
     <div class="modal-overlay" id="importModal" style="display:none;align-items:center;justify-content:center;" onclick="closeImportModal(event)">
         <div class="modal" onclick="event.stopPropagation()" style="max-width:700px;width:95%;max-height:90vh;overflow-y:auto;">
 
-            <!-- Tab 切换 -->
-            <div id="importTabBar" style="display:flex;gap:0;margin-bottom:20px;border-bottom:2px solid var(--border);">
-                <button id="importTabManual" onclick="switchImportTab('manual')"
-                    style="flex:1;padding:10px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;">
-                    ✏️ 手动输入
-                </button>
-                <button id="importTabScreenshot" onclick="switchImportTab('screenshot')"
-                    style="flex:1;padding:10px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;">
-                    📷 支付宝截图
-                </button>
-            </div>
+            <!-- 标题（截图识别已移至「设置」Tab，这里默认就是手动录入） -->
+            <div class="modal-title" id="importModalTitle" style="margin-bottom:18px;">更新持仓</div>
 
             <!-- ── 手动输入面板 ── -->
             <div id="importPanelManual">

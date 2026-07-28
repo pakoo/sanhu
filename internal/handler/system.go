@@ -35,6 +35,7 @@ func (h *Handler) GetSystemVersion(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"version":       ver,
+		"data_dir":      h.DataDir,
 		"git_tag":       tagVal,
 		"changelog_url": "https://github.com/pakoo/sanhu/releases",
 	})

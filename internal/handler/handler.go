@@ -11,13 +11,14 @@ type Handler struct {
 	DB      *sqlx.DB
 	Version string // 由 main.go 通过 ldflags 注入，e.g. "v1.0.0"
 	GitTag  string
+	DataDir string // 数据库所在目录，设置页要显示给用户（备份/搬迁靠它）
 }
 
 func New(db *sqlx.DB) *Handler { return &Handler{DB: db} }
 
 // NewWithVersion 携带版本信息创建 Handler（生产用）
-func NewWithVersion(db *sqlx.DB, version, gitTag string) *Handler {
-	return &Handler{DB: db, Version: version, GitTag: gitTag}
+func NewWithVersion(db *sqlx.DB, version, gitTag, dataDir string) *Handler {
+	return &Handler{DB: db, Version: version, GitTag: gitTag, DataDir: dataDir}
 }
 
 type taskState struct {

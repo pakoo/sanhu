@@ -50,7 +50,7 @@ func main() {
 	cronJob := scheduler.Start(database)
 	defer cronJob.Stop()
 
-	router := newRouter(staticFS, cfg.Debug, database)
+	router := newRouter(staticFS, cfg.Debug, database, cfg.DataDir)
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	// 用 ldflags 注入的 version（CI 打的是 -X main.version），
 	// cfg.Version 来自 config 包的同名变量，CI 并没有注入它，日志会永远显示 dev
@@ -60,7 +60,7 @@ func main() {
 	}
 }
 
-func newRouter(staticFS fs.FS, debug bool, database *sqlx.DB) *gin.Engine {
+func newRouter(staticFS fs.FS, debug bool, database *sqlx.DB, dataDir string) *gin.Engine {
 	if !debug {
 		gin.SetMode(gin.ReleaseMode)
 	}
@@ -86,7 +86,7 @@ func newRouter(staticFS fs.FS, debug bool, database *sqlx.DB) *gin.Engine {
 	api.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
-	h := handler.NewWithVersion(database, version, gitTag)
+	h := handler.NewWithVersion(database, version, gitTag, dataDir)
 	handler.RegisterRoutes(r, h)
 
 	// 未匹配的路由：/api/* 返回 501，其他返回 404

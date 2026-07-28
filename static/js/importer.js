@@ -5,15 +5,21 @@ let _importType = 'holdings';
 let _importFile = null;
 let _manualRows = [];   // 手动输入暂存
 
-// ── Tab 切换 ───────────────────────────────────────────────────
+// ── 面板切换 ───────────────────────────────────────────────────
+// 截图识别已从录入弹窗移到「设置」Tab（产品稿 Q4），弹窗默认只有手动录入；
+// 从设置页点进来时才显示截图面板。
 function switchImportTab(tab) {
     const isManual = tab === 'manual';
     document.getElementById('importPanelManual').style.display     = isManual ? 'block' : 'none';
     document.getElementById('importPanelScreenshot').style.display = isManual ? 'none'  : 'block';
-    const on  = 'color:var(--primary);border-bottom:2px solid var(--primary);margin-bottom:-2px;';
-    const off = 'color:var(--text-secondary);border-bottom:2px solid transparent;margin-bottom:-2px;';
-    document.getElementById('importTabManual').style.cssText     = `flex:1;padding:10px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;${isManual ? on : off}`;
-    document.getElementById('importTabScreenshot').style.cssText = `flex:1;padding:10px;border:none;background:none;cursor:pointer;font-size:14px;font-weight:600;${isManual ? off : on}`;
+    const title = document.getElementById('importModalTitle');
+    if (title) title.textContent = isManual ? '更新持仓' : '支付宝截图识别';
+}
+
+// 设置页入口：直接打开截图识别面板
+function openScreenshotImport() {
+    openImportModal();
+    switchImportTab('screenshot');
 }
 
 // ── 手动输入逻辑 ───────────────────────────────────────────────
