@@ -119,6 +119,8 @@ func GetPortfolioSummary(db *sqlx.DB) (*PortfolioSummary, error) {
 	}
 
 	summary := &PortfolioSummary{
+		// 空库时也要序列化成 []，与 Python 原版一致；否则前端 holdings.length 会炸
+		Holdings:         []Holding{},
 		Allocation:       map[string]float64{},
 		AllocationAmount: map[string]float64{},
 	}
