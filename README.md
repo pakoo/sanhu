@@ -2,7 +2,7 @@
 
 > 普通人买基金的决策助手。帮你看懂、帮你比较、帮你模拟 —— 最终由你决定。
 >
-> **单文件程序，双击即用** —— 原生 Windows / macOS / Linux 可执行文件，无需安装 Python 或任何依赖，首次启动自动下载初始数据。Python 旧版见 `final-python` tag。
+> **单文件程序，双击即用** —— 原生 Windows / macOS / Linux 可执行文件，无需安装 Python 或任何依赖，初始数据已内置，首启无需联网。Python 旧版见 `final-python` tag。
 
 ---
 
@@ -30,10 +30,12 @@ sanhu 是一个**单文件程序**：下载对应平台的可执行文件，双�
 
 | 平台 | 文件 |
 |---|---|
-| Windows | `sanhu-windows-amd64.zip`（解压后双击 `sanhu.exe`） |
+| Windows (Intel/AMD) | `sanhu-windows-amd64.zip`（解压后双击 `sanhu.exe`） |
+| Windows (ARM) | `sanhu-windows-arm64.zip` |
 | macOS (Apple 芯片) | `sanhu-darwin-arm64.tar.gz` |
 | macOS (Intel) | `sanhu-darwin-amd64.tar.gz` |
-| Linux | `sanhu-linux-amd64.tar.gz` |
+| Linux (x86_64) | `sanhu-linux-amd64.tar.gz` |
+| Linux (ARM64) | `sanhu-linux-arm64.tar.gz` |
 
 ### 运行
 
@@ -42,7 +44,9 @@ sanhu 是一个**单文件程序**：下载对应平台的可执行文件，双�
 
 然后浏览器打开 [http://localhost:8000](http://localhost:8000)。
 
-> **首次启动**会自动下载初始数据（约 1MB 的基金档案 / 估值历史），需要联网一次；之后即可离线使用。详见 [首次启动流程](docs/first-run.md)。
+> **首次启动**会把内置的初始数据（基金档案 / 估值历史）解压灌库，**全程不联网**。详见 [首次启动流程](docs/first-run.md)。
+>
+> 数据库存在**可执行文件同级的 `data/` 目录**里，换目录启动也不会丢数据；备份或搬迁直接拷这个目录。
 
 ### 从源码构建（开发者）
 
@@ -152,9 +156,9 @@ OCR 自动提取基金名称、持有金额、持有收益，可手动修正后�
 
 ## 数据说明
 
-### 初始数据（首次启动下载）
+### 初始数据（内置）
 
-首次启动时自动从 Release 下载初始参考数据（约 1MB，gzip 压缩），灌入本地数据库；之后离线可用：
+初始参考数据（gzip 压缩约 1.2MB）随二进制一起编译进程序，首次启动解压灌库，全程离线：
 
 | 数据表 | 内容 | 行数 |
 |---|---|---|
@@ -187,7 +191,7 @@ OCR 自动提取基金名称、持有金额、持有收益，可手动修正后�
 **后端全面重写为 Go**
 
 - 后端从 Python + FastAPI 迁移到 Go，前后端打包为**单个可执行文件**，下载即用，无需安装 Python 或任何依赖
-- 初始数据改为**首次启动自动下载**（约 1MB），安装包体积大幅减小
+- 初始数据**内置于二进制**，首次启动解压即用，无需联网
 - 内置跨平台编译（Windows / macOS / Linux）与自动更新
 - 修复迁移脚本与代码 schema 不一致的问题，全新安装可直接运行
 - Python 旧版保留在 `final-python` tag
@@ -214,9 +218,13 @@ OCR 自动提取基金名称、持有金额、持有收益，可手动修正后�
 
 未签名的二进制被 Gatekeeper 拦截。右键点击 → 打开 → 确认；或终端运行 `xattr -d com.apple.quarantine ./sanhu`。
 
-**首次启动提示下载初始数据失败**
+**想换一份初始数据**
 
-首次启动需联网下载一次初始数据。若所在网络访问 GitHub 受限，可设置环境变量 `SANHU_SEED_URL` 指向可达的镜像地址；下载失败不影响启动，重启会自动重试。
+初始数据已内置，正常情况无需任何配置。若要改用自建/内网的数据集，设置环境变量 `SANHU_SEED_URL` 指向一个 `seed.sql.gz`，首启空库时会改从该地址拉取（覆盖内置数据）。
+
+**想把数据库放到别处**
+
+默认在可执行文件同级的 `data/`。设置 `SANHU_DATA_DIR` 可指定任意目录。
 
 **端口 8000 被占用**
 

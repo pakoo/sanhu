@@ -1,32 +1,34 @@
 # 首次启动流程（First-Run Bootstrap）
 
-桌面版采用 **Go 单二进制 + 首启下载初始数据** 的交付方式：用户拿到一个可执行文件，
-双击即跑，无需安装 Python / Node / 数据库，初始参考数据在第一次启动时自动下载。
+桌面版采用 **Go 单二进制 + 内置初始数据** 的交付方式：用户拿到一个可执行文件，
+双击即跑，无需安装 Python / Node / 数据库，**首次启动也不需要联网**——
+初始参考数据以 gzip 形式编译进二进制，启动时解压灌库。
 
 ## 启动时序
 
 ```
 启动二进制
   │
-  ├─ 1. config.Load()         读环境变量（端口/数据目录/seed 源）
+  ├─ 1. config.Load()         读环境变量；数据目录默认取「可执行文件同级 data/」
   │
   ├─ 2. db.Open(DataDir)      打开/创建 <DataDir>/sanhu.db（SQLite，WAL）
   │
   ├─ 3. db.RunMigrations()    跑 migrations/001_init.sql 建表（幂等）
   │
-  ├─ 4. bootstrap.EnsureSeed()  ← 首启下载初始数据
+  ├─ 4. bootstrap.EnsureSeed()  ← 首启装载初始数据（默认不联网）
   │        │
   │        ├─ SELECT COUNT(*) FROM funds
-  │        ├─ >0 ？ → 跳过（老用户/重启不重复下载）
-  │        └─ =0 ？ → 下载 SeedURL 的 seed.sql.gz → gunzip → 单事务灌库
+  │        ├─ >0 ？ → 跳过（老用户/重启不重复灌库）
+  │        └─ =0 ？ → 解压内嵌 SeedSQLGz → 单事务灌库 → 按 fund_type 归一化 category
+  │                   （设了 SANHU_SEED_URL 则改从该 URL 下载，覆盖内嵌数据）
   │
   ├─ 5. scheduler.Start()     启动 8 个定时任务
   │
   └─ 6. router.Run(:Port)     前端(embed) + API 一起对外服务
 ```
 
-前端静态资源、AI prompts、SQL migrations 全部通过 `embed.go` 编译进二进制
-（`StaticFS` / `PromptsFS` / `MigrationsFS`），所以"统一打包前后端"即一个文件。
+前端静态资源、AI prompts、SQL migrations、初始数据全部通过 `embed.go` 编译进二进制
+（`StaticFS` / `PromptsFS` / `MigrationsFS` / `SeedSQLGz`），所以"统一打包前后端"即一个文件。
 
 ## 初始数据（seed）
 
@@ -34,8 +36,10 @@
   `index_pe_history` / `nav_history` / `fund_industry` / `fund_holdings`。
 - **不含**：用户私有数据（holdings / decisions / watchlist / transactions / simulations）——
   seed 是公共参考数据，绝不含任何个人持仓。
-- **来源文件**：`seed/seed.sql.gz`（约 1.2MB，仓库内）；release 时由 `.github/workflows/release.yml`
-  作为资产发布到 `releases/latest/download/seed.sql.gz`。
+- **来源文件**：`seed/seed.sql.gz`（约 1.2MB，仓库内），由 `embed.go` 编译进二进制；
+  同时仍作为可选资产随 release 发布，供 `SANHU_SEED_URL` 指向内网镜像时使用。
+- **分类归一化**：seed 是早期代码生成的，`category` 全为 mixed 而 `fund_type` 正确，
+  灌库后由 `fundcat.NormalizeAll` 按 `fund_type` 重算一次。
 - **格式**：gzip 压缩的纯 `INSERT` 语句（无 CREATE，依赖 migration 已建好的 schema）。
 
 ## 配置（环境变量）
