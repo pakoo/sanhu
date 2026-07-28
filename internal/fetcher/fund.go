@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/pakoo/sanhu/internal/fundcat"
 )
 
 var (
@@ -22,27 +23,8 @@ var (
 	reRiskLevel   = regexp.MustCompile(`风险等级[^<]*</th>\s*<td[^>]*>([^<]+)</td>`)
 )
 
-// fundCategoryRules 按优先级顺序匹配（QDII 先于股票，避免"QDII-股票"被误判为 equity）
-var fundCategoryRules = []struct {
-	keyword  string
-	category string
-}{
-	{"QDII", "qdii"},
-	{"债券", "bond"},
-	{"货币", "money"},
-	{"指数", "equity"},
-	{"股票", "equity"},
-	{"混合", "mixed"},
-}
-
-func inferCategory(fundType string) string {
-	for _, rule := range fundCategoryRules {
-		if strings.Contains(fundType, rule.keyword) {
-			return rule.category
-		}
-	}
-	return "mixed"
-}
+// 分类判定统一走 fundcat 包（映射表只此一份，见该包注释）
+func inferCategory(fundType string) string { return fundcat.Infer(fundType) }
 
 // FetchFundInfo 抓取单只基金基本信息，UPSERT 到 funds 表
 func FetchFundInfo(db *sqlx.DB, code string) error {
