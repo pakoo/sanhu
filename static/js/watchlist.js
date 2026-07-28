@@ -139,7 +139,7 @@ function _renderSparkline(elId, navValues) {
 
     let chart;
     try {
-        chart = echarts.init(el);
+        chart = initChart(el);
     } catch (e) { return; }
 
     const isPositive = navValues[navValues.length - 1] >= navValues[0];

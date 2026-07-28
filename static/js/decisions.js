@@ -398,7 +398,7 @@
                 setTimeout(() => {
                     const chartEl = document.getElementById(chartId);
                     if (!chartEl || typeof echarts === 'undefined') return;
-                    const chart = echarts.init(chartEl);
+                    const chart = initChart(chartEl);
                     const dates = perf.nav_curve.map(p => p.date);
                     const fundLine = perf.nav_curve.map(p => (p.pnl_pct * 100).toFixed(2));
                     const hs300Line = (perf.hs300_curve || []).map(p => (p.pnl_pct * 100).toFixed(2));

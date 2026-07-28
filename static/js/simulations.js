@@ -304,7 +304,7 @@
             _simChart = null;
         }
 
-        _simChart = echarts.init(chartEl);
+        _simChart = initChart(chartEl);
 
         if (!snapshots.length) {
             _simChart.setOption({

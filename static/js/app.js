@@ -91,6 +91,25 @@ let valuationData = null;   // v2.0: market PE signals
 let watchlistData = null;   // 关注列表
 let activeFilters = new Set(['bond', 'equity', 'mixed', 'qdii']);
 
+// === 图表初始化统一入口 ===
+// 只监听 window.resize 不够：容器宽度会在窗口尺寸不变时改变（隐藏 Tab 切出来、
+// 侧栏展开、滚动条出现），此时 canvas 还停在 init 时的旧尺寸，图就错位。
+// 改用 ResizeObserver 盯容器本身；同时复用已有实例，避免同一 DOM 重复 init。
+function initChart(elOrId) {
+    const el = typeof elOrId === 'string' ? document.getElementById(elOrId) : elOrId;
+    if (!el) return null;
+    const chart = echarts.getInstanceByDom(el) || echarts.init(el);
+    if (!el._chartResizeObserved) {
+        // 回调里重新取实例：dispose 后重建的图表也能继续跟随容器
+        new ResizeObserver(() => {
+            const cur = echarts.getInstanceByDom(el);
+            if (cur) cur.resize();
+        }).observe(el);
+        el._chartResizeObserved = true;
+    }
+    return chart;
+}
+
 // === Tab 切换 ===
 function switchTab(tab) {
     document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
@@ -217,6 +236,8 @@ async function loadDashboard() {
             API.getPortfolio(),
             API.getFundScores().catch(() => []),
         ]);
+        // 兜底：后端空库可能返回 holdings=null，下面所有渲染都按数组用
+        if (portfolioData && !Array.isArray(portfolioData.holdings)) portfolioData.holdings = [];
         renderSummaryCards(portfolioData);
         renderAllocationChart(portfolioData);
         renderReturnChart(portfolioData);
@@ -257,7 +278,7 @@ function renderSummaryCards(data) {
 }
 
 function renderAllocationChart(data) {
-    const chart = echarts.init(document.getElementById('allocationChart'));
+    const chart = initChart(document.getElementById('allocationChart'));
     const categoryNames = { bond: '债券型', equity: '股票型', mixed: '混合型', qdii: 'QDII/海外' };
     const colors = { bond: '#60a5fa', equity: '#f87171', mixed: '#fbbf24', qdii: '#34d399' };
 
@@ -276,17 +297,16 @@ function renderAllocationChart(data) {
             data: pieData,
         }]
     });
-    window.addEventListener('resize', () => chart.resize());
 }
 
 function renderReturnChart(data) {
-    const chart = echarts.init(document.getElementById('returnChart'));
+    const chart = initChart(document.getElementById('returnChart'));
     const holdings = [...data.holdings].sort((a, b) => a.profit_rate - b.profit_rate);
 
     chart.setOption({
         tooltip: { trigger: 'axis', formatter: params => {
             const p = params[0];
-            return `${p.name}<br/>收益率: ${p.value >= 0 ? '+' : ''}${p.value}%`;
+            return `${p.name}<br/>收益率: ${p.value >= 0 ? '+' : ''}${p.value.toFixed(2)}%`;
         }},
         grid: { left: 120, right: 40, top: 20, bottom: 20 },
         xAxis: { type: 'value', axisLabel: { formatter: '{value}%' } },
@@ -305,12 +325,11 @@ function renderReturnChart(data) {
             label: {
                 show: true,
                 position: 'right',
-                formatter: p => `${p.value >= 0 ? '+' : ''}${p.value}%`,
+                formatter: p => `${p.value >= 0 ? '+' : ''}${p.value.toFixed(2)}%`,
                 fontSize: 12,
             }
         }]
     });
-    window.addEventListener('resize', () => chart.resize());
 }
 
 function toggleFilter(cat) {
@@ -466,7 +485,7 @@ function renderRiskAlerts(alerts) {
 function renderCorrelationChart(data) {
     if (!data.matrix || !data.matrix.length) return;
 
-    const chart = echarts.init(document.getElementById('correlationChart'));
+    const chart = initChart(document.getElementById('correlationChart'));
     const names = data.names.map(n => truncateName(n, 6));
     const values = [];
 
@@ -497,13 +516,12 @@ function renderCorrelationChart(data) {
             label: { show: true, formatter: p => p.value[2].toFixed(2), fontSize: 11 },
         }]
     });
-    window.addEventListener('resize', () => chart.resize());
 }
 
 function renderVolatilityChart(volData) {
     if (!volData || !volData.fund_vols) return;
 
-    const chart = echarts.init(document.getElementById('volatilityChart'));
+    const chart = initChart(document.getElementById('volatilityChart'));
     const entries = Object.entries(volData.fund_vols);
 
     // 获取基金名称
@@ -527,7 +545,6 @@ function renderVolatilityChart(volData) {
             label: { show: true, position: 'top', formatter: '{c}%', fontSize: 11 }
         }]
     });
-    window.addEventListener('resize', () => chart.resize());
 }
 
 // === Tab 3: 调仓建议 ===
@@ -547,7 +564,7 @@ async function loadRebalance() {
 }
 
 function renderAllocationCompare(data) {
-    const chart = echarts.init(document.getElementById('allocationCompareChart'));
+    const chart = initChart(document.getElementById('allocationCompareChart'));
     const categoryNames = { bond: '债券型', equity: '股票型', mixed: '混合型', qdii: 'QDII' };
     const categories = Object.keys(data.target_allocation);
     const labels = categories.map(c => categoryNames[c] || c);
@@ -574,7 +591,6 @@ function renderAllocationCompare(data) {
             }
         ]
     });
-    window.addEventListener('resize', () => chart.resize());
 }
 
 function renderTargetSliders(targets) {
@@ -678,7 +694,7 @@ async function loadTransitionPlan() {
     const plan = await API.getTransitionPlan(months, monthly);
     if (!plan.length) return;
 
-    const chart = echarts.init(document.getElementById('transitionChart'));
+    const chart = initChart(document.getElementById('transitionChart'));
     const categoryNames = { bond: '债券型', equity: '股票型', mixed: '混合型', qdii: 'QDII' };
     const colors = { bond: '#60a5fa', equity: '#f87171', mixed: '#fbbf24', qdii: '#34d399' };
     const categories = Object.keys(plan[0].allocation_after);
@@ -697,7 +713,6 @@ async function loadTransitionPlan() {
             itemStyle: { color: colors[cat] || '#94a3b8' },
         }))
     });
-    window.addEventListener('resize', () => chart.resize());
 }
 
 // === Tab 4: 回测 ===
@@ -832,7 +847,7 @@ function renderBacktestCurve(data) {
     const card = document.getElementById('btChartCard');
     card.style.display = 'block';
 
-    const chart = echarts.init(document.getElementById('btCurveChart'));
+    const chart = initChart(document.getElementById('btCurveChart'));
     const curve = data.curve || [];
 
     chart.setOption({
@@ -873,7 +888,6 @@ function renderBacktestCurve(data) {
             }
         ]
     });
-    window.addEventListener('resize', () => chart.resize());
 }
 
 // === 基金详情模态框：档案/同类排名/投资范围三大块 ===
@@ -984,7 +998,7 @@ async function showFundDetail(code) {
         // 渲染净值走势
         if (detail.nav_history && detail.nav_history.length) {
             const navData = [...detail.nav_history].reverse();
-            const chart = echarts.init(document.getElementById('modalNavChart'));
+            const chart = initChart(document.getElementById('modalNavChart'));
 
             chart.setOption({
                 tooltip: {
@@ -1054,7 +1068,7 @@ async function loadFundHoldingsInModal(code) {
 
         // 行业分布饼图
         if (industry.industries && industry.industries.length) {
-            const chart = echarts.init(document.getElementById('modalIndustryChart'));
+            const chart = initChart(document.getElementById('modalIndustryChart'));
             chart.setOption({
                 tooltip: {
                     trigger: 'item',
@@ -1165,7 +1179,7 @@ function renderIndustryBreakdown(data) {
         document.getElementById('industryReportDate').textContent = `数据截至 ${data.report_date}`;
     }
 
-    const chart = echarts.init(document.getElementById('industryBreakdownChart'));
+    const chart = initChart(document.getElementById('industryBreakdownChart'));
     const top10 = industries.slice(0, 10);
 
     chart.setOption({
@@ -1198,7 +1212,6 @@ function renderIndustryBreakdown(data) {
             label: { show: true, position: 'right', formatter: '{c}%', fontSize: 11 },
         }]
     });
-    window.addEventListener('resize', () => chart.resize());
 }
 
 async function refreshHoldingsData() {
