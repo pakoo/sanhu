@@ -34,8 +34,9 @@ func main() {
 		log.Fatalf("run migrations: %v", err)
 	}
 
-	// 首启空库时下载初始参考数据；失败非致命，空库可启动，下次启动自动重试。
-	if err := bootstrap.EnsureSeed(context.Background(), database, cfg.SeedURL, log.Printf); err != nil {
+	// 首启空库时装载初始参考数据（默认解压内嵌数据，不联网）。
+	// 失败非致命：空库仍可启动，下次启动自动重试。
+	if err := bootstrap.EnsureSeed(context.Background(), database, sanhugo.SeedSQLGz, cfg.SeedURL, log.Printf); err != nil {
 		log.Printf("warning: 初始数据装载失败（将空库启动，下次启动重试）: %v", err)
 	}
 
@@ -51,7 +52,9 @@ func main() {
 
 	router := newRouter(staticFS, cfg.Debug, database)
 	addr := fmt.Sprintf(":%d", cfg.Port)
-	log.Printf("sanhu v%s listening on %s", cfg.Version, addr)
+	// 用 ldflags 注入的 version（CI 打的是 -X main.version），
+	// cfg.Version 来自 config 包的同名变量，CI 并没有注入它，日志会永远显示 dev
+	log.Printf("sanhu %s listening on %s (data: %s)", version, addr, cfg.DataDir)
 	if err := router.Run(addr); err != nil {
 		log.Fatalf("run server: %v", err)
 	}
