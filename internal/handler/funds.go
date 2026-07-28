@@ -116,8 +116,21 @@ func (h *Handler) GetFundNav(c *gin.Context) {
 	c.JSON(http.StatusOK, rows)
 }
 
+// GetFundRealtime 盘中实时估值 —— 数据源已下线，暂无替代。
+//
+// Python 版用的是 fundgz.1234567.com.cn/js/{code}.js（JSONP 的 gsz/gszzl 字段），
+// 2026-07-28 复核：该域名对所有基金代码都返回 404 页面，接口已被东财移除，
+// 因此这不是 Go 重写的遗漏 —— 把 Python 原版跑起来同样拿不到数据。
+//
+// 保留端点是为了不破坏前端契约（api.js 有 getRealtime 封装），
+// 返回 503 + 明确原因，比返回一个含糊的 "not implemented" 更容易排查。
+// 若要恢复此功能，需要先找到新的估值数据源。
 func (h *Handler) GetFundRealtime(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"error": "not implemented"})
+	c.JSON(http.StatusServiceUnavailable, gin.H{
+		"status": "unavailable",
+		"code":   c.Param("code"),
+		"msg":    "实时估值数据源已下线（fundgz.1234567.com.cn 已停止服务），暂无替代来源；净值请以每日更新为准",
+	})
 }
 
 func (h *Handler) GetFundScores(c *gin.Context) {

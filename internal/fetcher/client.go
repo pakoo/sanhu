@@ -27,13 +27,35 @@ func get(url string) ([]byte, error) {
 	return nil, lastErr
 }
 
+// getWithReferer 与 get 相同，但可指定 Referer。
+// 东财不同子站对来源要求不一样：行情接口 push2 只认 quote 域，
+// 用基金站的 Referer 去请求会拿到空响应。
+func getWithReferer(url, referer string) ([]byte, error) {
+	var lastErr error
+	for i := 0; i < 3; i++ {
+		if i > 0 {
+			time.Sleep(time.Second)
+		}
+		b, err := doGetWithReferer(url, referer)
+		if err == nil {
+			return b, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
 func doGet(url string) ([]byte, error) {
+	return doGetWithReferer(url, "https://fundf10.eastmoney.com/")
+}
+
+func doGetWithReferer(url, referer string) ([]byte, error) {
 	req, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("User-Agent", userAgent)
-	req.Header.Set("Referer", "https://fundf10.eastmoney.com/")
+	req.Header.Set("Referer", referer)
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
