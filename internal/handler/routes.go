@@ -42,6 +42,12 @@ func RegisterRoutes(r *gin.Engine, h *Handler) {
 	api.POST("/backtest/takeprofit", h.BacktestTakeProfit)
 	api.POST("/backtest/portfolio", h.BacktestPortfolio)
 
+	// 市场板块（全球指标 + AI 关注区）
+	api.GET("/market/global", h.GetGlobalMarket)
+	api.GET("/market/ai-watchlist", h.GetAIWatchlist)
+	api.POST("/market/ai-watchlist", h.SaveAIWatchlist)
+	api.GET("/market/quote-lookup", h.LookupQuote)
+
 	api.GET("/market/valuation", h.GetMarketValuation)
 	api.POST("/market/valuation/refresh", h.RefreshMarketValuation)
 	api.POST("/peer-ranks/refresh", h.RefreshPeerRanks)

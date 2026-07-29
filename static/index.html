@@ -87,6 +87,7 @@
     <div class="tabs">
         <div class="container" style="display:flex;gap:0;">
             <button class="tab-btn active" onclick="switchTab('dashboard')">总览</button>
+            <button class="tab-btn" onclick="switchTab('market')">市场</button>
             <button class="tab-btn" onclick="switchTab('risk')">风险分析</button>
             <button class="tab-btn" onclick="switchTab('rebalance')">调仓建议</button>
             <button class="tab-btn" onclick="switchTab('backtest')">策略回测</button>
@@ -749,6 +750,18 @@
             </div>
         </div>
 
+        <!-- Tab: 市场（全球指标 + AI 特别关注）-->
+        <div class="tab-content" id="tab-market">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+                <div style="font-size:13px;color:var(--text-secondary);">
+                    全球关键指标与 AI 板块信号。数据来自公开行情接口，仅供参考，不构成投资建议。
+                </div>
+                <button class="btn btn-primary" id="marketRefreshBtn" onclick="loadMarket(true)"
+                        style="font-size:13px;padding:6px 18px;white-space:nowrap;">刷新行情</button>
+            </div>
+            <div id="marketBody"></div>
+        </div>
+
         <!-- Tab 9: 设置 -->
         <div class="tab-content" id="tab-settings">
             <div class="card" style="margin-bottom:16px;">
@@ -801,6 +814,38 @@
                         项目主页
                         <a href="https://github.com/pakoo/sanhu" target="_blank" rel="noopener" style="color:var(--primary);">github.com/pakoo/sanhu</a>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI 关注名单管理（市场板块 M5）-->
+    <div class="modal-overlay" id="aiWatchModal" style="display:none;align-items:center;justify-content:center;" onclick="closeAIWatchModal(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width:520px;width:94%;">
+            <div class="modal-title">管理 AI 关注名单</div>
+            <div style="display:flex;gap:8px;margin:14px 0 6px;">
+                <input id="aiWatchInput" type="text" placeholder="美股填代码如 NVDA，A股填 6 位数字如 300308"
+                       onkeydown="if(event.key==='Enter')aiWatchAdd()"
+                       style="flex:1;padding:8px 12px;border:1px solid var(--border);border-radius:10px;font-size:13px;">
+                <button class="btn btn-primary" id="aiWatchAddBtn" onclick="aiWatchAdd()" style="white-space:nowrap;">添加</button>
+            </div>
+            <div id="aiWatchError" style="display:none;color:#ef4444;font-size:12.5px;margin-bottom:8px;"></div>
+
+            <div style="font-size:12px;color:var(--text-secondary);font-weight:700;margin:14px 0 7px;">
+                美股（<span id="aiWatchUSCount">0</span>）
+            </div>
+            <div id="aiWatchUS" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+
+            <div style="font-size:12px;color:var(--text-secondary);font-weight:700;margin:16px 0 7px;">
+                A股（<span id="aiWatchCNCount">0</span>）
+            </div>
+            <div id="aiWatchCN" style="display:flex;gap:8px;flex-wrap:wrap;"></div>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:22px;">
+                <button class="btn" onclick="aiWatchSave(true)" style="font-size:12.5px;">恢复默认名单</button>
+                <div style="display:flex;gap:10px;">
+                    <button class="btn" onclick="closeAIWatchModal()">取消</button>
+                    <button class="btn btn-primary" id="aiWatchSaveBtn" onclick="aiWatchSave(false)">完成</button>
                 </div>
             </div>
         </div>
@@ -1044,16 +1089,17 @@
         </div>
     </div>
 
-    <script src="/static/js/terms.js?v=20260729"></script>
-    <script src="/static/js/tooltip.js?v=20260729"></script>
-    <script src="/static/js/guide.js?v=20260729"></script>
-    <script src="/static/js/api.js?v=20260729"></script>
-    <script src="/static/js/app.js?v=20260729"></script>
-    <script src="/static/js/watchlist.js?v=20260729"></script>
-    <script src="/static/js/importer.js?v=20260729"></script>
-    <script src="/static/js/selector.js?v=20260729"></script>
-    <script src="/static/js/decisions.js?v=20260729"></script>
-    <script src="/static/js/simulations.js?v=20260729"></script>
+    <script src="/static/js/terms.js?v=20260729b"></script>
+    <script src="/static/js/tooltip.js?v=20260729b"></script>
+    <script src="/static/js/guide.js?v=20260729b"></script>
+    <script src="/static/js/api.js?v=20260729b"></script>
+    <script src="/static/js/app.js?v=20260729b"></script>
+    <script src="/static/js/watchlist.js?v=20260729b"></script>
+    <script src="/static/js/importer.js?v=20260729b"></script>
+    <script src="/static/js/selector.js?v=20260729b"></script>
+    <script src="/static/js/decisions.js?v=20260729b"></script>
+    <script src="/static/js/simulations.js?v=20260729b"></script>
+    <script src="/static/js/market.js?v=20260729b"></script>
 
 <!-- ── 微信浮动入口 ───────────────────────────────────────────── -->
 <div id="wxWidget">

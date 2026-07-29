@@ -24,6 +24,14 @@
 
 ## 二、发布一个版本
 
+**发版前的人工核对项**（内置数据，无可靠免费接口，见市场板块产品稿 Q5）：
+
+- [ ] `internal/market/macro.go` 的 `macroSnapshot`：联邦基金利率 / CPI / 非农，改完同步更新对应的 AsOf
+- [ ] `internal/market/macro.go` 的 `fomcDates`：新年度的议息日历（federalreserve.gov 年初公布）
+- [ ] `internal/market/macro.go` 的 `aiEvents`：AI 公司财报日（各公司 IR 页面）
+
+以上留空时前端显示「待补充」，不会显示错误数字，所以漏更新不会造成误导，只是少了信息。
+
 ```bash
 # 1. 确认 main 是干净的、CI 能过
 git checkout main && git pull

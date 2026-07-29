@@ -124,6 +124,7 @@ function switchTab(tab) {
     if (tab === 'rebalance' && !valuationData) loadValuation();
     if (tab === 'simulations' && typeof simInit === 'function') simInit();
     if (tab === 'settings') loadSettings();
+    if (tab === 'market') loadMarket(false);
     // 模块使用说明区
     if (typeof initModuleGuide === 'function') initModuleGuide(tab);
 }
