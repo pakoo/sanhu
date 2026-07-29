@@ -15,6 +15,7 @@ import (
 type Gap struct {
 	Category   string  `json:"category"`
 	Theme      string  `json:"theme"`
+	CurrentPct float64 `json:"current_pct"` // 当前在该主题上的实际暴露，前端要显示"暴露 X%"
 	DeficitPct float64 `json:"deficit_pct"`
 	Priority   int     `json:"priority"`
 }
@@ -56,6 +57,7 @@ func DiagnosePortfolioGaps(db *sqlx.DB) ([]Gap, error) {
 		gaps = append(gaps, Gap{
 			Category:   "industry",
 			Theme:      item.Industry,
+			CurrentPct: item.TotalWeight,
 			DeficitPct: deficit,
 			Priority:   gapPriority(deficit),
 		})
@@ -82,24 +84,32 @@ func BuildCandidatePool(db *sqlx.DB, category, theme string, minAUM float64) ([]
 		}
 	}
 
+	// 候选池必须从 fund_profile 起（全市场约 2.8 万只），不能从 funds 起。
+	// funds 表只装用户碰过的基金——新装的用户那里就 11 只（内置数据），
+	// 从中选基永远选不出东西：推荐结果恒为空，而页面不会报错，看起来像"没推荐"。
+	// Python 版同样是以 fund_profile 为全集（UNION funds 兜底）。
+	//
+	// 另外两列真实存在的筛选字段是 theme_tags / top_industry / sub_style；
+	// 原来写的 investment_objective / strategy / tracking_index 在库里根本不存在，
+	// 一调用就报 "no such column"。
 	var textRows []string
 	if err := db.Select(&textRows, `
-		SELECT DISTINCT f.code
-		FROM funds f
-		LEFT JOIN fund_profile p ON p.code=f.code
-		WHERE COALESCE(f.scope, 0) >= ?
+		SELECT DISTINCT p.code
+		FROM fund_profile p
+		LEFT JOIN funds f ON f.code=p.code
+		WHERE COALESCE(p.aum, 0) >= ?
 		  AND EXISTS (
-			SELECT 1 FROM fund_peer_ranks r WHERE r.code=f.code
+			SELECT 1 FROM fund_peer_ranks r WHERE r.code=p.code
 		  )
 		  AND (
 			? = ''
-			OR f.name LIKE '%' || ? || '%'
+			OR COALESCE(p.name, '') LIKE '%' || ? || '%'
+			OR COALESCE(p.theme_tags, '') LIKE '%' || ? || '%'
+			OR COALESCE(p.top_industry, '') LIKE '%' || ? || '%'
+			OR COALESCE(p.sub_style, '') LIKE '%' || ? || '%'
 			OR COALESCE(f.fund_type, '') LIKE '%' || ? || '%'
-			OR COALESCE(p.investment_objective, '') LIKE '%' || ? || '%'
-			OR COALESCE(p.strategy, '') LIKE '%' || ? || '%'
-			OR COALESCE(p.tracking_index, '') LIKE '%' || ? || '%'
 		  )
-		ORDER BY COALESCE(f.scope, 0) DESC, f.code ASC
+		ORDER BY COALESCE(p.aum, 0) DESC, p.code ASC
 		LIMIT 300
 	`, minAUM, theme, theme, theme, theme, theme, theme); err != nil {
 		return nil, fmt.Errorf("query candidate pool: %w", err)
@@ -203,25 +213,27 @@ func GenerateRecommendation(db *sqlx.DB, answers UserAnswers) (*RecommendationRe
 		SessionID:     sessionID,
 	}
 
-	cacheValue, err := json.Marshal(struct {
-		Answers UserAnswers          `json:"answers"`
-		Result  RecommendationResult `json:"result"`
-	}{
-		Answers: answers,
-		Result:  *result,
-	})
+	// selector_cache 的真实结构是 (session_id, answers_json, gaps_json, candidates_json, created_at)，
+	// 见 migrations/001_init.sql。原来这里按 (cache_key, cache_value, expires_at, updated_at) 写，
+	// 那套列名在库里根本不存在 —— 推荐一生成就报 "no such column"，整个选基流程走不完。
+	answersJSON, err := json.Marshal(answers)
 	if err != nil {
-		return nil, fmt.Errorf("marshal selector cache: %w", err)
+		return nil, fmt.Errorf("marshal selector answers: %w", err)
+	}
+	gapsJSON, err := json.Marshal(gaps)
+	if err != nil {
+		return nil, fmt.Errorf("marshal selector gaps: %w", err)
+	}
+	candidatesJSON, err := json.Marshal(topCandidates)
+	if err != nil {
+		return nil, fmt.Errorf("marshal selector candidates: %w", err)
 	}
 
 	if _, err := db.Exec(`
-		INSERT INTO selector_cache (cache_key, cache_value, expires_at, updated_at)
-		VALUES (?, ?, datetime('now', '+7 days'), CURRENT_TIMESTAMP)
-		ON CONFLICT(cache_key) DO UPDATE SET
-			cache_value=excluded.cache_value,
-			expires_at=excluded.expires_at,
-			updated_at=CURRENT_TIMESTAMP
-	`, sessionID, string(cacheValue)); err != nil {
+		INSERT OR REPLACE INTO selector_cache
+			(session_id, answers_json, gaps_json, candidates_json, created_at)
+		VALUES (?, ?, ?, ?, datetime('now'))
+	`, sessionID, string(answersJSON), string(gapsJSON), string(candidatesJSON)); err != nil {
 		return nil, fmt.Errorf("write selector cache: %w", err)
 	}
 
@@ -272,16 +284,18 @@ func candidateCodesByIndustry(db *sqlx.DB, theme string, minAUM float64) ([]stri
 		return nil, err
 	}
 
+	// 同样的问题：INNER JOIN funds 会把候选限死在用户已有的那几只基金上。
+	// 改join fund_profile（全市场），规模用 profile 的 aum 字段。
 	query := fmt.Sprintf(`
 		SELECT DISTINCT fi.%s
 		FROM fund_industry fi
-		INNER JOIN funds f ON f.code=fi.%s
+		INNER JOIN fund_profile p ON p.code=fi.%s
 		WHERE %s=?
-		  AND COALESCE(f.scope, 0) >= ?
+		  AND COALESCE(p.aum, 0) >= ?
 		  AND EXISTS (
-			SELECT 1 FROM fund_peer_ranks r WHERE r.code=f.code
+			SELECT 1 FROM fund_peer_ranks r WHERE r.code=p.code
 		  )
-		ORDER BY COALESCE(f.scope, 0) DESC, fi.%s ASC
+		ORDER BY COALESCE(p.aum, 0) DESC, fi.%s ASC
 		LIMIT 300
 	`, fundCodeCol, fundCodeCol, industryCol, fundCodeCol)
 
