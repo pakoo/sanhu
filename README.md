@@ -2,7 +2,7 @@
 
 > 普通人买基金的决策助手。帮你看懂、帮你比较、帮你模拟 —— 最终由你决定。
 >
-> **单文件程序，双击即用** —— 原生 Windows / macOS / Linux 可执行文件，无需安装 Python 或任何依赖，初始数据已内置，首启无需联网。Python 旧版见 `final-python` tag。
+> **单文件程序，双击即用** —— 原生 Windows / macOS 可执行文件，无需安装 Python 或任何依赖，初始数据已内置，首启无需联网。Linux 用户可自行 `go build`（见「从源码构建」）。Python 旧版见 `final-python` tag。
 
 ![持仓总览](images/dashboard.png)
 
@@ -37,8 +37,6 @@ sanhu 是一个**单文件程序**。整个安装过程就三步：**下载 → 
 | **macOS**（2020 年前的 Intel Mac） | `sanhu-darwin-amd64.zip` | 关于本机里写「处理器 Intel…」就选这个 |
 | **Windows**（绝大多数电脑） | `sanhu-windows-amd64.zip` | 不确定就选这个，市面上 95% 的 Windows 是它 |
 | **Windows**（ARM 笔记本，如 Surface Pro X） | `sanhu-windows-arm64.zip` | 设置 → 系统 → 系统信息里写「基于 ARM」才选这个 |
-| **Linux**（x86_64） | `sanhu-linux-amd64.tar.gz` | 终端跑 `uname -m` 显示 `x86_64` |
-| **Linux**（ARM64，如树莓派） | `sanhu-linux-arm64.tar.gz` | `uname -m` 显示 `aarch64` |
 
 ### 第二步：解压并启动
 
@@ -78,19 +76,6 @@ sanhu 是一个**单文件程序**。整个安装过程就三步：**下载 → 
 
 </details>
 
-<details>
-<summary><b>🐧 Linux 的完整步骤</b></summary>
-
-```bash
-tar -xzf sanhu-linux-amd64.tar.gz
-chmod +x sanhu
-./sanhu
-```
-
-浏览器会自动打开；若无图形界面，手动访问 `http://localhost:8000`。
-
-</details>
-
 ### 第三步：录入你的持仓
 
 打开后是空的，点「**更新持仓**」按基金代码把持仓填进去（三个数字，一只基金十几秒）。详见下面的[录入持仓](#录入持仓)。
@@ -105,7 +90,7 @@ chmod +x sanhu
 |---|---|
 | macOS | `SANHU_PORT=8123 /Applications/sanhu.app/Contents/MacOS/sanhu` |
 | Windows（PowerShell） | `$env:SANHU_PORT=8123; .\sanhu.exe` |
-| Linux | `SANHU_PORT=8123 ./sanhu` |
+| Linux（自行构建） | `SANHU_PORT=8123 ./sanhu` |
 
 | 环境变量 | 作用 | 默认值 |
 |---|---|---|
@@ -119,7 +104,7 @@ chmod +x sanhu
 |---|---|
 | macOS | `~/Library/Application Support/sanhu/` |
 | Windows | `sanhu.exe` 同级的 `data\` 文件夹 |
-| Linux | 可执行文件同级的 `data/` 文件夹 |
+| Linux（自行构建） | 可执行文件同级的 `data/` 文件夹 |
 
 备份或换电脑，把这个目录整个拷走即可。**升级新版本不会动到它。**
 

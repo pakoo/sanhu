@@ -31,14 +31,9 @@ jobs:
             goarch: arm64
             suffix: ""
             asset_name: sanhu-darwin-arm64
-          - goos: linux
-            goarch: amd64
-            suffix: ""
-            asset_name: sanhu-linux-amd64
-          - goos: linux
-            goarch: arm64
-            suffix: ""
-            asset_name: sanhu-linux-arm64
+          # 只发 macOS 与 Windows：这工具面向个人投资者，用 Linux 桌面看基金的
+          # 基本没有，每次都构建两个 linux 包只是拖长发版时间。
+          # 需要 Linux 的用户可以自己 go build（README「从源码构建」一节有说明）。
 
     steps:
       - uses: actions/checkout@v4
