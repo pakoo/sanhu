@@ -66,6 +66,8 @@ func RegisterRoutes(r *gin.Engine, h *Handler) {
 
 	api.POST("/import/parse", h.ImportParse)
 	api.POST("/import/commit", h.ImportCommit)
+	// 录入后补档案/净值的后台进度；失败明细在这里，前端据此生成可复制的报错信息
+	api.GET("/import/status", h.GetImportStatus)
 
 	api.GET("/watchlist", h.GetWatchlist)
 	api.POST("/watchlist/add", h.AddWatchlist)

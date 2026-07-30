@@ -123,19 +123,106 @@ function updateManualCommitBtn() {
 
 async function commitManualImport() {
     const btn = document.getElementById('manualCommitBtn');
+    const codes = _manualRows.map(r => r.code);
+    ErrReport.hide('importErrorBox');
     btn.disabled = true;
     btn.textContent = '提交中…';
+
+    // 提交本身只写库，正常是毫秒级。给 15 秒超时是为了兜住数据库被后台
+    // 任务占住连接的情况 —— 无论如何都不会再让按钮无限期停在「提交中…」。
+    let res;
     try {
-        await API.commitImport({ import_type: 'holdings', rows: _manualRows });
-        document.getElementById('importModal').style.display = 'none';
-        _manualRows = [];
-        portfolioData = null;
-        await loadDashboard();
+        res = await ErrReport.fetchJSON('/api/import/commit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ import_type: 'holdings', rows: _manualRows }),
+        }, 15000);
     } catch (e) {
         btn.disabled = false;
         btn.textContent = '确认更新';
-        alert('提交失败，请重试');
+        await ErrReport.show('importErrorBox', {
+            title: e.timedOut ? '提交超时了，持仓可能没保存' : '提交失败',
+            body: e.timedOut
+                ? '服务在 15 秒内没有响应。先关掉弹窗看看总览里有没有这几只基金：<b>有就是已经存上了</b>，没有请再点一次「确认更新」。'
+                : '持仓没有保存，可以再试一次。反复失败的话，把下面的报错信息发给作者。',
+        }, {
+            action: '手动录入持仓 · 提交',
+            codes, error: e.message, httpStatus: e.httpStatus, elapsedMs: e.elapsedMs,
+        });
+        return;
     }
+
+    // 提交成功 —— 持仓已经落库，剩下的抓净值/档案在后台跑，不该再挡着用户
+    document.getElementById('importModal').style.display = 'none';
+    _manualRows = [];
+    portfolioData = null;
+    await loadDashboard();
+
+    if (res && res.pending && res.pending.length) {
+        watchImportBackfill(res.pending);
+    }
+}
+
+/* watchImportBackfill 盯着后台补数据，完成后刷新总览。
+ *
+ * 这一步失败不影响持仓已经存上：净值抓不到时市值按你填的金额显示
+ * （entered_value 兜底），所以这里只提示、不回滚。
+ */
+async function watchImportBackfill(codes) {
+    const deadline = Date.now() + 90000;
+    let last = null;
+
+    showBackfillToast(`正在后台获取 ${codes.length} 只基金的净值…`);
+
+    while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 1500));
+        try {
+            last = await ErrReport.fetchJSON('/api/import/status', {}, 10000);
+        } catch (e) {
+            break; // 状态接口本身挂了就别再轮询，下面统一提示
+        }
+        if (!last.running) break;
+    }
+
+    hideBackfillToast();
+    portfolioData = null;
+    await loadDashboard();
+
+    if (last && last.failed > 0) {
+        // 后台补数据失败：持仓还在，只是净值没抓到。开个弹窗让用户能复制报错。
+        openImportModal();
+        document.getElementById('importModal').style.display = 'flex';
+        await ErrReport.show('importErrorBox', {
+            title: `${last.failed} 只基金的净值没获取到`,
+            body: '<b>持仓已经保存好了</b>，总览里按你填的金额显示市值，只是暂时算不出涨跌。' +
+                  '多半是网络不通或数据源限流 —— 稍后在顶部点「更新净值」可以重试。' +
+                  '如果一直不行，把下面的报错信息发给作者。',
+        }, {
+            action: '录入后补净值/档案',
+            codes, error: `${last.failed} 只失败、${last.ok} 只成功`,
+            detail: last.failure_text,
+        });
+    } else if (last && last.ok > 0) {
+        showBackfillToast(`${last.ok} 只基金的净值已补齐`, 2500);
+    }
+}
+
+function showBackfillToast(msg, autoHide) {
+    let el = document.getElementById('backfillToast');
+    if (!el) {
+        el = document.createElement('div');
+        el.id = 'backfillToast';
+        el.className = 'backfill-toast';
+        document.body.appendChild(el);
+    }
+    el.innerHTML = `<span class="backfill-dot"></span>${msg}`;
+    el.classList.add('show');
+    if (autoHide) setTimeout(hideBackfillToast, autoHide);
+}
+
+function hideBackfillToast() {
+    const el = document.getElementById('backfillToast');
+    if (el) el.classList.remove('show');
 }
 
 // ── 开启弹窗 ───────────────────────────────────────────────────

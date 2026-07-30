@@ -981,3 +981,46 @@ body {
     opacity: 0; pointer-events: none; transition: .22s; max-width: 84vw; text-align: center;
 }
 .ai-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ============================================================================
+   可复制的报错面板（errreport.js）
+   出错时当场生成一段结构化文本，用户点一下复制直接发给作者 ——
+   比「提交卡住了」这种描述省掉好几轮追问。
+   ============================================================================ */
+.err-box {
+    background: #fff5f4; border: 1px solid #f3d3d0; border-radius: var(--radius-sm);
+    padding: 13px 15px; margin: 14px 0;
+}
+.err-title { font-size: 13.5px; font-weight: 700; color: #b23c33; margin-bottom: 6px; }
+.err-msg { font-size: 12.5px; color: var(--text-secondary); line-height: 1.85; }
+.err-msg b { color: var(--text); }
+.err-detail { margin-top: 10px; }
+.err-detail summary {
+    font-size: 12px; color: var(--text-secondary); cursor: pointer;
+    user-select: none; padding: 3px 0;
+}
+.err-detail summary:hover { color: var(--text); }
+.err-text {
+    width: 100%; height: 190px; margin-top: 8px; padding: 10px 12px;
+    font-family: 'SF Mono', Menlo, monospace; font-size: 11.5px; line-height: 1.7;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: #fff; color: var(--text-secondary); resize: vertical;
+}
+.err-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 11px; }
+.err-actions .btn { padding: 7px 16px; font-size: 12.5px; }
+.err-hint { font-size: 11.5px; color: var(--text-secondary); line-height: 1.7; }
+
+/* 后台补数据的常驻提示条 */
+.backfill-toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(14px);
+    background: rgba(27,35,52,.94); color: #fff; font-size: 12.5px; font-weight: 600;
+    padding: 10px 18px; border-radius: var(--radius-pill); z-index: 1500;
+    opacity: 0; pointer-events: none; transition: .22s;
+    display: flex; align-items: center; gap: 8px;
+}
+.backfill-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.backfill-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: var(--primary-2);
+    animation: backfillPulse 1.1s ease-in-out infinite;
+}
+@keyframes backfillPulse { 0%,100% { opacity: 1 } 50% { opacity: .25 } }

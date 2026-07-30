@@ -4,12 +4,10 @@ import (
 	"encoding/csv"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pakoo/sanhu/internal/fetcher"
 	"github.com/pakoo/sanhu/internal/importer"
 	"github.com/pakoo/sanhu/internal/portfolio"
 )
@@ -134,6 +132,7 @@ func (h *Handler) ImportCommit(c *gin.Context) {
 	}
 
 	inserted, updated := 0, 0
+	var pending []string // 需要后台补档案/净值的基金
 	switch req.ImportType {
 	case "holdings":
 		for _, row := range req.Rows {
@@ -154,18 +153,16 @@ func (h *Handler) ImportCommit(c *gin.Context) {
 			if costAmount == 0 && amount > 0 {
 				costAmount = amount - profit
 			}
-			// 顺序要紧：先保证 funds 里有这只基金，再抓净值。
-			// nav_history 对 funds(code) 有外键，反过来做的话净值写入会被外键直接拒掉。
+			// 这里**不抓网**。
 			//
-			// 先试着抓真实档案：只塞 code+name 会得到一只没有 fund_type / category 的空壳基金，
-			// 分类、评分、风险、持仓穿透全部拿它没办法。
-			var known int
-			_ = h.DB.Get(&known, `SELECT COUNT(*) FROM funds WHERE code=? AND COALESCE(fund_type,'')!=''`, code)
-			if known == 0 {
-				if err := fetcher.FetchFundInfo(h.DB, code); err != nil {
-					log.Printf("[import] 抓取 %s 档案失败: %v", code, err)
-				}
-			}
+			// 曾经是同步抓的：档案 2 个 URL + 净值 1 个 URL，每个 URL 在
+			// fetcher.get() 里重试 3 次 × 15 秒超时 + 2 次 1 秒间隔 = 最坏 47 秒，
+			// 单只基金最坏 141 秒，多只还是串行 —— 而前端 fetch 没有超时，
+			// 于是按钮就永远停在「提交中…」。用户报的「卡住」就是这个。
+			//
+			// 现在提交只写库：entered_value 会兜住显示（见 migrations/002），
+			// 净值和档案交给下面的后台任务补，失败原因记进 importFetchTask
+			// 供前端生成可复制的报错信息。
 			fundName := fmt.Sprint(row["name"])
 			if fundName == "" {
 				fundName = code
@@ -173,20 +170,13 @@ func (h *Handler) ImportCommit(c *gin.Context) {
 			_, _ = h.DB.Exec(`INSERT OR IGNORE INTO funds (code, name) VALUES (?,?)`, code, fundName)
 
 			if shares == 0 && amount > 0 {
-				nav := h.latestNavForImport(code)
-				if nav == 0 {
-					// 库里没有净值 —— 内置数据只有 11 只基金，用户录入的基金多半不在里面。
-					// 不补这一刀的话 shares 落 0，市值 = 净值 × 份额 = 0，用户填的钱就没了。
-					if err := fetcher.FetchNav(h.DB, code, 1095); err != nil {
-						log.Printf("[import] 抓取 %s 净值失败（将按「净值未更新」显示）: %v", code, err)
-					}
-					nav = h.latestNavForImport(code)
-				}
-				if nav > 0 {
+				if nav := h.latestNavForImport(code); nav > 0 {
 					shares = amount / nav
 				}
-				// 仍然抓不到时保留 shares=0，由 entered_value 兜底显示，见 migrations/002
+				// 库里没净值就保留 shares=0，由 entered_value 兜底显示，
+				// 后台任务抓到净值后会把份额补上（见 backfillImported）
 			}
+			pending = append(pending, code)
 
 			var cnt int
 			if err := h.DB.Get(&cnt, `SELECT COUNT(*) FROM holdings WHERE code=?`, code); err != nil {
@@ -240,5 +230,14 @@ func (h *Handler) ImportCommit(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"status": "ok", "inserted": inserted, "updated": updated})
+	// 抓取全部挪到后台：提交本身只写库，永远是毫秒级返回。
+	// 前端拿 pending 去轮询 /api/import/status，失败明细在那里。
+	if len(pending) > 0 {
+		h.startImportBackfill(pending)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status": "ok", "inserted": inserted, "updated": updated,
+		"pending": pending,
+	})
 }

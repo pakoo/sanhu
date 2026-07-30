@@ -1054,6 +1054,8 @@
                         <span style="font-size:13px;">将更新列表中基金的持仓数据，列表外的持仓不受影响，请勾选确认后继续</span>
                     </label>
                 </div>
+                <!-- 报错面板：出问题时展开，里面那段文字可一键复制发给作者 -->
+                <div id="importErrorBox" class="err-box" style="display:none;"></div>
                 <div style="display:flex;justify-content:flex-end;gap:10px;">
                     <button class="btn" onclick="closeImportModal(null)" style="background:#f1f5f9;color:var(--text);">取消</button>
                     <button class="btn btn-primary" id="manualCommitBtn" onclick="commitManualImport()" disabled>确认更新</button>
@@ -1148,6 +1150,7 @@
     <script src="/static/js/terms.js?v=20260730b"></script>
     <script src="/static/js/tooltip.js?v=20260730b"></script>
     <script src="/static/js/guide.js?v=20260730b"></script>
+    <script src="/static/js/errreport.js?v=20260730d"></script>
     <script src="/static/js/api.js?v=20260730b"></script>
     <script src="/static/js/app.js?v=20260730b"></script>
     <script src="/static/js/watchlist.js?v=20260730b"></script>
