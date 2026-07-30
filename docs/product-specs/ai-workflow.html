@@ -1,0 +1,859 @@
+<!doctype html>
+<!-- ============================================================================
+     市场板块 · 产品稿
+     从 ~/.claude/templates/product-spec-template.html 起手，决策卡引擎原样保留
+     交付前跑：node ~/.claude/hooks/check-product-spec.mjs docs/product-specs/market.html
+     ============================================================================ -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI 协作流程 · 产品稿</title>
+<style>
+:root{
+  --bg:#eef2f6; --panel:#fff;
+  --ink:#22303f; --ink-2:#54687c; --muted:#93a3b3; --line:#e4edf4;
+  --primary:#7cb4de; --primary-deep:#4b89bb; --primary-soft:#eef7ff;
+  --danger:#e2685f;
+  --shadow:0 8px 20px rgba(63,96,127,.10);
+  --shadow-sm:0 3px 10px rgba(63,96,127,.07);
+  --dq-open:#e9a23b; --dq-open-bg:#fffaf0;
+  --dq-done:#52a67c; --dq-done-bg:#f2faf6;
+  /* 产品自身（V3 柔和理财）的令牌，稿内帧用它 */
+  --app:#4f46e5; --app-2:#7c6df2; --app-soft:#eef0fd;
+  --up:#f43f5e; --dn:#10b981;  /* 全站已定：红涨绿跌 */
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+.doc{max-width:1560px;margin:0 auto;padding:0 26px 90px}
+h1{font-size:25px;font-weight:800;margin:0 0 6px}
+h2.sec{font-size:19px;font-weight:800;margin:38px 0 14px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;scroll-margin-top:76px}
+h2.sec::before{content:"";width:5px;height:19px;border-radius:3px;background:var(--primary-deep)}
+.doc-head{padding:30px 0 6px}
+.doc-head .sub{font-size:13px;color:var(--ink-2);line-height:1.9}
+.pill{display:inline-block;font-size:11.5px;font-weight:800;border-radius:20px;padding:3px 11px;margin-right:7px}
+.pill.draft{background:#fff4e2;color:#a8720f}
+.pill.base{background:var(--primary-soft);color:var(--primary-deep)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 19px;box-shadow:var(--shadow-sm);font-size:13.5px;line-height:1.85;color:var(--ink-2)}
+.card b{color:var(--ink)}
+.card.warn{background:#fffaf0;border-color:#f0dcb8}
+table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:10px 0}
+th{background:#f7fafc;text-align:left;padding:9px 12px;font-weight:700;color:var(--ink-2);border-bottom:1px solid var(--line)}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+code{background:#f1f4f7;border-radius:5px;padding:1px 5px;font-size:12px;font-family:"SF Mono",Menlo,monospace;color:#b8446a}
+.scrollx{overflow-x:auto}
+.tag-ok{background:#e8f6ee;color:#2f7d58;border:1px solid #cbe8da;border-radius:5px;font-size:10.5px;font-weight:800;padding:1px 7px}
+.tag-tbd{background:#fff4e2;color:#a8720f;border:1px solid #f0dcb8;border-radius:5px;font-size:10.5px;font-weight:800;padding:1px 7px}
+.tag-new{background:#e8f6ee;color:#2f7d58;border:1px solid #cbe8da;border-radius:5px;font-size:10.5px;font-weight:800;padding:1px 7px}
+.tag-state{background:#f4f7fa;color:#6c8092;border:1px solid #dde7ef;border-radius:5px;font-size:10.5px;font-weight:700;padding:1px 7px}
+
+.cap{font-size:14px;font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.cap .no{background:var(--primary-deep);color:#fff;border-radius:7px;padding:2px 9px;font-size:11.5px;font-weight:800}
+.capsub{font-size:12px;color:var(--ink-2);margin:0 0 12px;line-height:1.75;max-width:920px}
+.capsub b{color:var(--ink)}
+.mockwrap{border-radius:14px;overflow-x:auto;box-shadow:var(--shadow);border:1px solid var(--line);margin-bottom:8px}
+.mk{min-width:820px;background:linear-gradient(180deg,#f6f8ff,#fdfdff);font-family:"PingFang SC",sans-serif;color:#1b2334}
+.browser{height:30px;background:#f2f5f8;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:6px;padding:0 12px}
+.browser i{width:9px;height:9px;border-radius:50%;background:#dbe3ea;font-style:normal}
+.browser .url{margin-left:10px;font-size:10.5px;color:var(--muted);background:#fff;border:1px solid var(--line);border-radius:11px;padding:2px 13px}
+.mk .nav{background:linear-gradient(120deg,var(--app),var(--app-2));color:#fff;padding:10px 16px;font-size:13px;font-weight:800;display:flex;justify-content:space-between;align-items:center}
+.mk .nav .v{font-size:9.5px;background:rgba(255,255,255,.22);border-radius:9px;padding:1px 7px;margin-left:7px}
+.mk .nav .rbtn{background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);border-radius:16px;padding:4px 13px;font-size:11px}
+.mk .tabs{display:flex;gap:6px;padding:10px 16px 6px;overflow:hidden}
+.mk .tabs span{font-size:11px;color:#6b7590;background:#fff;border:1px solid #eceffa;border-radius:15px;padding:4px 12px;white-space:nowrap}
+.mk .tabs b{font-size:11px;color:#fff;background:#1b2334;border-radius:15px;padding:4px 12px;white-space:nowrap;font-weight:700}
+.mk .body{padding:10px 16px 18px}
+.mcard{background:#fff;border-radius:16px;padding:13px 15px;box-shadow:0 4px 14px rgba(27,35,52,.05);margin-bottom:11px}
+.mcard .h{font-size:12px;font-weight:800;margin-bottom:9px;display:flex;justify-content:space-between;align-items:center}
+.mcard .h em{font-style:normal;font-size:9.5px;color:#a5add8;font-weight:600}
+.mgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:11px}
+.mgrid3{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+.q{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-bottom:1px solid #f4f5fb;font-size:11.5px}
+.q:last-child{border-bottom:none}
+.q .n{color:#3b465c}
+.q .n i{font-style:normal;font-size:9px;color:#a5add8;margin-left:5px}
+.q .v{font-weight:800;font-variant-numeric:tabular-nums}
+.q .c{font-weight:700;font-size:10.5px;width:62px;text-align:right;font-variant-numeric:tabular-nums}
+.up{color:var(--up)}.dn{color:var(--dn)}.flat{color:#8b95ad}
+.sigbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:11px}
+.sig{background:#fff;border-radius:13px;box-shadow:0 3px 10px rgba(27,35,52,.05);padding:8px 13px;font-size:10.5px;color:#6b7590}
+.sig b{display:block;font-size:14.5px;font-weight:800;color:#1b2334;margin-top:2px;font-variant-numeric:tabular-nums}
+.sig b.up{color:var(--up)}.sig b.dn{color:var(--dn)}
+.macro{background:linear-gradient(120deg,var(--app),var(--app-2));border-radius:16px;color:#fff;padding:13px 16px;margin-bottom:11px;display:flex;gap:26px;align-items:center;flex-wrap:wrap}
+.macro .big .l{font-size:9.5px;opacity:.8}
+.macro .big .v{font-size:21px;font-weight:800;letter-spacing:-.5px}
+.macro .it{font-size:9.5px;opacity:.85;border-left:1px solid rgba(255,255,255,.25);padding-left:18px}
+.macro .it b{display:block;font-size:13px;font-weight:700;margin-top:2px}
+.term table{border:1px solid #e4e9f4;font-size:10.5px;margin:0;font-family:"SF Mono",Menlo,monospace}
+.term th{font-size:9px;letter-spacing:1px;padding:6px 10px}
+.term td{padding:5px 10px;font-variant-numeric:tabular-nums}
+.aicoin{display:flex;align-items:center;justify-content:space-between;background:#fff;border-radius:13px;box-shadow:0 3px 10px rgba(27,35,52,.05);padding:9px 13px;font-size:11px}
+.aicoin .nm b{display:block;font-size:11.5px}
+.aicoin .nm i{font-style:normal;font-size:9px;color:#a5add8}
+.aicoin .px{text-align:right;font-variant-numeric:tabular-nums}
+.aicoin .px b{display:block;font-size:12.5px}
+.evt{display:flex;gap:9px;font-size:10.5px;padding:6px 0;border-bottom:1px dashed #eef0fa;align-items:baseline}
+.evt:last-child{border-bottom:none}
+.evt .d{color:var(--app);font-weight:800;width:44px;flex:none}
+.gray{filter:grayscale(1);opacity:.62}
+.note-in-frame{font-size:10px;color:var(--muted);margin-top:7px;line-height:1.7}
+.flow{font-family:"SF Mono",Menlo,monospace;font-size:12px;line-height:2;white-space:pre;overflow-x:auto;color:var(--ink-2)}
+.flow b{color:var(--ink)}
+.flow .bad{color:var(--danger);font-weight:700}
+
+/* ============ 内联决策卡（勿删）============ */
+.dqbar{position:sticky;top:0;z-index:200;margin:0 -26px 18px;padding:11px 26px;
+  background:rgba(238,242,246,.94);backdrop-filter:blur(10px);border-bottom:1px solid #d7e3ec;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.dqbar .p-txt{font-size:13px;font-weight:800;white-space:nowrap}
+.dqbar .p-txt em{font-style:normal;color:var(--dq-open)}
+.dqbar .p-txt.all-done em{color:var(--dq-done)}
+.dqbar .p-track{flex:1;min-width:120px;height:8px;border-radius:5px;background:#d3e0ea;overflow:hidden}
+.dqbar .p-fill{height:100%;width:0;border-radius:5px;background:linear-gradient(90deg,#8ecfae,var(--dq-done));transition:width .25s}
+.dqbar button{font-size:12.5px;font-weight:700;padding:7px 15px;border-radius:19px;cursor:pointer;
+  border:1px solid #c6d6e2;background:#fff;color:var(--ink-2);white-space:nowrap}
+.dqbar button:hover{border-color:var(--primary);color:var(--primary-deep)}
+.dqbar button.primary{background:var(--primary-deep);border-color:var(--primary-deep);color:#fff}
+.dqbar button.ghost-danger:hover{border-color:var(--danger);color:var(--danger)}
+.dqrail{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:190;
+  display:flex;flex-direction:column;gap:8px;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);
+  border:1px solid #dce7ef;border-radius:22px;padding:10px 8px;box-shadow:var(--shadow-sm)}
+.dqrail .rdot{width:26px;height:26px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:10.5px;font-weight:800;background:var(--dq-open-bg);color:var(--dq-open);border:1.5px solid var(--dq-open);transition:.15s}
+.dqrail .rdot:hover{transform:scale(1.12)}
+.dqrail .rdot.done{background:var(--dq-done-bg);color:var(--dq-done);border-color:var(--dq-done)}
+@media(max-width:1180px){.dqrail{display:none}}
+.dq{margin:16px 0 6px;border-radius:14px;border:1px solid #f0dcb8;border-left:6px solid var(--dq-open);
+  background:var(--dq-open-bg);padding:15px 18px 16px;scroll-margin-top:78px;box-shadow:var(--shadow-sm)}
+.dq.answered{border-color:#cbe8da;border-left-color:var(--dq-done);background:var(--dq-done-bg)}
+.dq-hd{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:4px}
+.dq-id{background:var(--dq-open);color:#fff;font-size:11.5px;font-weight:800;border-radius:7px;padding:2px 9px}
+.dq.answered .dq-id{background:var(--dq-done)}
+.dq-state{font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;background:#fff;color:var(--dq-open);border:1px solid #f0dcb8}
+.dq.answered .dq-state{color:var(--dq-done);border-color:#cbe8da}
+.dq:not(.answered) .dq-state{animation:dqPulse 2.2s ease-in-out infinite}
+@keyframes dqPulse{0%,100%{opacity:1}50%{opacity:.45}}
+.dq-q{font-size:14.5px;font-weight:800;line-height:1.6}
+.dq-sub{font-size:12.5px;color:var(--ink-2);line-height:1.8;margin-top:5px}
+.dq-sub code{background:#fff;border:1px solid #e6d9c0}
+.dq-opts{margin-top:11px;display:flex;flex-direction:column;gap:8px}
+.dq-opt{display:flex;align-items:flex-start;gap:10px;cursor:pointer;background:#fff;
+  border:1.5px solid #e8dcc4;border-radius:11px;padding:11px 13px;transition:.15s}
+.dq-opt:hover{border-color:var(--dq-open);box-shadow:0 2px 8px rgba(233,162,59,.13)}
+.dq-opt input{width:17px;height:17px;margin-top:2px;flex:none;accent-color:var(--dq-done);cursor:pointer}
+.dq-opt.sel{border-color:var(--dq-done);background:var(--dq-done-bg)}
+.dq-opt .o-body{flex:1;min-width:0}
+.dq-opt .o-t{font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.dq-opt .o-d{font-size:12px;color:var(--ink-2);line-height:1.75;margin-top:3px}
+.rec-chip{background:var(--primary-soft);color:var(--primary-deep);border:1px solid #cfe6f7;border-radius:5px;font-size:10.5px;font-weight:800;padding:1px 7px;white-space:nowrap}
+.cost-chip{background:#f4f7fa;color:#6c8092;border:1px solid #dde7ef;border-radius:5px;font-size:10.5px;font-weight:700;padding:1px 7px;white-space:nowrap}
+.dq-note{margin-top:10px}
+.dq-note label{display:block;font-size:11.5px;color:var(--muted);font-weight:700;margin-bottom:5px}
+.dq-note textarea{width:100%;min-height:52px;resize:vertical;border:1.5px solid #e8dcc4;border-radius:10px;
+  padding:9px 11px;font-size:13px;font-family:inherit;line-height:1.7;background:#fff}
+.dq-note textarea:focus{outline:none;border-color:var(--dq-open)}
+.sec-badge{display:inline-flex;align-items:center;gap:5px;background:var(--dq-open-bg);color:#a8720f;
+  border:1px solid #f0dcb8;border-radius:20px;font-size:11.5px;font-weight:800;padding:3px 11px}
+.sec-badge.done{background:var(--dq-done-bg);color:#2f7d58;border-color:#cbe8da}
+.sec-badge i{width:7px;height:7px;border-radius:50%;background:var(--dq-open);font-style:normal}
+.sec-badge.done i{background:var(--dq-done)}
+.dqsum-row{display:flex;align-items:flex-start;gap:12px;padding:11px 13px;border-radius:11px;background:#fff;
+  border:1px solid var(--line);border-left:4px solid var(--dq-open);margin-bottom:9px;cursor:pointer}
+.dqsum-row.done{border-left-color:var(--dq-done)}
+.dqsum-row .s-id{font-size:12px;font-weight:800;color:var(--ink);flex:none;width:34px}
+.dqsum-row .s-q{flex:1;min-width:0;font-size:12.5px;color:var(--ink-2);line-height:1.7}
+.dqsum-row .s-a{flex:none;max-width:46%;font-size:12.5px;font-weight:800;color:var(--dq-done);text-align:right;line-height:1.7}
+.dqsum-row:not(.done) .s-a{color:var(--dq-open)}
+.dqsum-row .s-a .s-note{display:block;font-weight:600;color:var(--ink-2);font-size:11.5px;margin-top:3px}
+.dq-out{width:100%;min-height:130px;resize:vertical;margin-top:12px;border:1.5px solid var(--line);border-radius:12px;
+  padding:12px 14px;font-family:"SF Mono",Menlo,monospace;font-size:12.5px;line-height:1.85;background:#fbfdff}
+.dq-out:focus{outline:none;border-color:var(--primary)}
+.copy-hint{font-size:12px;color:var(--muted);margin-top:9px;line-height:1.8}
+.toast{position:fixed;left:50%;bottom:38px;transform:translateX(-50%) translateY(14px);background:rgba(34,48,63,.94);
+  color:#fff;font-size:13px;font-weight:700;padding:11px 22px;border-radius:24px;z-index:400;opacity:0;pointer-events:none;transition:.22s}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+.tag-bad{background:#fdecea;color:#c0392b;border:1px solid #f5c6c0;border-radius:5px;font-size:10.5px;font-weight:800;padding:1px 7px}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <div class="dqbar">
+    <span class="p-txt" id="pTxt">0 / 0 已决策</span>
+    <div class="p-track"><div class="p-fill" id="pFill"></div></div>
+    <button id="btnNext">跳到下一个待决策 ↓</button>
+    <button class="primary" id="btnCopyTop">复制答案给 Claude</button>
+    <button class="ghost-danger" id="btnReset">清空</button>
+  </div>
+  <div class="dqrail" id="dqRail"></div>
+
+  <div class="doc-head">
+    <h1>AI 协作流程 — 产品稿</h1>
+    <div class="sub">
+      <span class="pill draft">待确认</span><span class="pill base">桌面 Web · 基准宽 1280px</span><br>
+      落地文件：<b>static/index.html · static/js/*.js · internal/handler/{selector,funds,helpers}.go · prompts/</b><br>
+      日期：<b>2026-07-30</b>　·　共 <b>5</b> 个决策点
+    </div>
+  </div>
+
+  <section>
+    <h2 class="sec">一、问题是什么</h2>
+    <div class="card">
+      你指着选基页那两个按钮说「用户看了根本不知道怎么玩」。我把全站四个 AI 入口逐个拆开看了，
+      问题比按钮文案严重得多 —— <b>三个入口的导出内容是坏的，一个入口的说明是缺的</b>。<br><br>
+
+      <b>这个功能本该是产品的核心卖点。</b>项目设计原则里写着「无后端 AI：不调用任何 LLM API，
+      AI 功能通过生成 Prompt 让用户自己去问」。也就是说：工具的价值在于<b>把你的真实持仓整理成
+      一份 AI 看得懂、且只有这个工具才拿得出来的结构化数据</b>。这件事现在没做到。
+    </div>
+
+    <h3 class="sub3">四个入口的实际状态（都是实测，不是推测）</h3>
+    <div class="scrollx">
+      <table>
+        <tr><th style="width:120px">入口</th><th style="width:110px">位置</th><th>用户复制到的实际内容</th><th style="width:70px">状态</th></tr>
+        <tr>
+          <td><b>AI持仓解读</b></td><td>总览页</td>
+          <td>一段纯文字：「当前组合总市值约 213261.70 元。兴业一年持有债券A（014248）占用约 154184.53 元，<b>分类 bond</b>。…」<br>
+            <span style="color:#a8720f">有数据但没有指令，不告诉 AI 要回答什么；分类是英文 bond/equity/qdii；金额不带千分位</span></td>
+          <td><span class="tag-mod">半成品</span></td>
+        </tr>
+        <tr>
+          <td><b>赛道分析</b></td><td>基金详情弹窗</td>
+          <td>一份 2789 字的 prompt 模板，结构很完整（持股表 / peer 对比 / PE 百分位 / 择时信号）<b>但占位符全是原样的</b>：<br>
+            <code>#赛道分析请求 —— {seed_name}（{seed_code}）</code><br>
+            <code>- **代码**：{seed_code}　- **主题标签**：{seed_theme_tags}</code><br>
+            <span style="color:#c0392b">开头还带着 484 字给开发看的注释（version / data_dependencies / philosophy_check）一起被复制走</span></td>
+          <td><span class="tag-bad">坏的</span></td>
+        </tr>
+        <tr>
+          <td><b>导出 Claude 提示词</b></td><td>选基页</td>
+          <td>标题 <code># Selector Session selector-20260730162911</code> + 一坨原始 JSON：<br>
+            <code>{"answers":{"direction":"auto",…},"gaps":[{"theme":"工业金属","deficit_pct":9.62,"priority":3},…],"candidates":[]}</code><br>
+            <span style="color:#c0392b">没有一句指令。浮点数是 7.1899999999999995。空的 candidates 也照样导出</span></td>
+          <td><span class="tag-bad">坏的</span></td>
+        </tr>
+        <tr>
+          <td><b>导出 JSON</b></td><td>选基页</td>
+          <td>和上一个<b>内容几乎一样</b>，只是少了 markdown 代码围栏<br>
+            <span style="color:#c0392b">两个按钮并排放着，导出同一份东西</span></td>
+          <td><span class="tag-bad">冗余</span></td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="card warn" style="margin-top:14px">
+      <b>为什么会这样：</b>赛道分析的 prompt 模板是 Python 时代精心写的（模板里那段
+      <code>philosophy_check</code> 甚至自我要求「不只是『请分析 X』式的空问题」），
+      渲染逻辑在 <code>backend/ai_prompts.py</code> 里 —— 有构建持股表、peer 对比表、
+      PE 百分位、择时信号的完整代码。<br>
+      Go 重写时，这个接口变成了一行 <code>ReadFile(prompts/theme_analysis.md)</code> 原样返回，
+      <b>渲染整块没实现</b>。选基的导出则是直接把 session 缓存的 JSON 打出来。<br>
+      这是 Go 重写漏掉的第五处同类问题（前四处：持仓解析器、行业抓取、调仓建议契约、选基链路）。
+    </div>
+
+    <div class="card" style="margin-top:12px">
+      <b>不在本轮范围：</b>不接入任何 LLM API（这是项目原则，不改）；
+      选基候选池的数据质量问题（另有决策）；缺口口径本身（另有决策）。
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">二、用户现在卡在哪（走一遍就知道）</h2>
+    <div class="card">
+      <div class="flow"><b>【现状动线】</b>
+用户在选基页答完 4 道题 → 点「生成选基推荐」→ 看到三张缺口卡
+                                                    │
+                                    看到右上角两个按钮：导出 Claude 提示词 / 导出 JSON
+                                                    │
+                              <span class="bad">？ 这俩有什么区别</span>　<span class="bad">？ 导出去干什么</span>　<span class="bad">？ 粘到哪里</span>
+                                                    │
+                                            点了「导出提示词」
+                                                    │
+                                    toast：「已复制到剪贴板，粘贴到 Claude 即可开始对话 🎉」
+                                                    │
+                              <span class="bad">？ Claude 是什么　？ 在哪　？ 要付费吗　？ 粘完问什么</span>
+                                                    │
+                                          粘进去，Claude 收到一坨 JSON
+                                                    │
+                                  <span class="bad">Claude：「你想让我分析什么？」← 用户放弃</span>
+
+<b>【目标动线】</b>
+用户点「让 AI 分析这份数据」→ 弹窗当场显示：<b>会发送什么</b> + <b>会得到什么</b> + <b>去哪粘</b>
+                                          │
+                              一键复制（内容是完整 prompt，含指令与提问）
+                                          │
+                              按钮直达 claude.ai / chatgpt.com（新窗口）
+                                          │
+                                  粘贴 → AI 给出有结构的分析
+                                          │
+                              回到工具，<b>Q5 决定这一步做不做</b>：把结论存档 / 转成决策记录</div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">三、入口怎么组织（E1 三方案）</h2>
+
+    <div class="row">
+      <div class="wcol">
+        <div class="cap"><span class="no">E1-甲</span>就地强化：每处入口自带说明<span class="tag-mod">改动小</span></div>
+        <div class="capsub">四个入口留在原地，但每个都换成「一句话说明 + 一个按钮」，点开是统一的预览弹窗</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000 · 选基</span></div>
+          <div class="body">
+            <div class="panelbox" style="margin-bottom:10px">
+              <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+                <div style="font-size:11.5px;line-height:1.75">
+                  <b style="font-size:12.5px">让 AI 帮你分析这份诊断</b><br>
+                  <span style="color:var(--muted)">把 19 个配置缺口和你的问卷答案整理成一份提示词，<br>复制后粘给 Claude 或 ChatGPT，得到「该补哪个方向、怎么分批」的建议</span>
+                </div>
+                <span class="btn pri" style="white-space:nowrap">预览并复制</span>
+              </div>
+            </div>
+            <div class="note-in-frame">「导出 JSON」收进「⋯」次级菜单（给想自己处理数据的人留着）</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wcol">
+        <div class="cap"><span class="no">E1-乙</span>统一 AI 面板：加一个 Tab<span class="tag-new">新增</span></div>
+        <div class="capsub">四种分析集中到一个「AI 分析」Tab，各页只留一个「去 AI 分析」的跳转</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000 · AI 分析</span></div>
+          <div class="tabs"><span>总览</span><span>市场</span><span>风险</span><span>调仓</span><span>穿透</span><span>选基</span><b>AI 分析</b></div>
+          <div class="body">
+            <div class="panelbox" style="margin-bottom:9px">
+              <div style="font-size:12px;font-weight:800;margin-bottom:6px">选一种分析</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:11px">
+                <div style="border:1px solid var(--app);background:var(--app-soft);border-radius:8px;padding:8px 10px">
+                  <b>持仓体检</b><br><span style="color:var(--muted)">7 只基金 · 21.3 万</span></div>
+                <div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px">
+                  <b>配置缺口</b><br><span style="color:var(--muted)">19 个缺口</span></div>
+                <div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px">
+                  <b>单只基金赛道</b><br><span style="color:var(--muted)">选一只</span></div>
+                <div style="border:1px solid var(--line);border-radius:8px;padding:8px 10px">
+                  <b>决策复盘</b><br><span style="color:var(--muted)">暂无决策</span></div>
+              </div>
+            </div>
+            <div class="note-in-frame">好处：AI 能力有了固定位置，用户知道去哪找<br>代价：与「在哪看到数据就在哪分析」的直觉相悖，导航又多一个 Tab</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wcol">
+        <div class="cap"><span class="no">E1-丙</span>甲 + 乙：就地入口 + 汇总页<span class="tag-new">新增</span></div>
+        <div class="capsub">各页就地可用，同时设置页里放一个「AI 分析」汇总入口做兜底</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="body">
+            <div class="panelbox" style="margin-bottom:9px;border-color:var(--app);background:var(--app-soft)">
+              <div style="font-size:11.5px"><b>就地入口</b>（总览/选基/穿透/决策各一个）<br>
+                <span style="color:var(--muted)">看到哪份数据，就在那里分析</span></div>
+            </div>
+            <div class="panelbox">
+              <div style="font-size:11.5px"><b>设置 → AI 分析</b><br>
+                <span style="color:var(--muted)">列出全部四种分析，供不知道去哪找的用户兜底</span></div>
+            </div>
+            <div class="note-in-frame">工作量最大，但两种使用习惯都覆盖</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dq" id="Q1" data-q="Q1" data-title="AI 入口怎么组织">
+      <div class="dq-hd"><span class="dq-id">Q1</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">AI 分析的入口放在哪？</div>
+      <div class="dq-sub">现在四个入口散在四个地方，措辞各不相同（「AI持仓解读」/「导出 Claude 提示词」/「查看赛道分析」）。<b>不统一的代价</b>：用户在总览学会了一次，到选基页又是一套陌生说法。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q1" value="甲 · 就地强化，每处入口自带说明">
+          <span class="o-body">
+            <span class="o-t">甲 · 就地强化<span class="rec-chip">我建议</span><span class="cost-chip">前端 ~1 天</span></span>
+            <span class="o-d">「看到哪份数据就在那里分析」最符合直觉，也不用新增导航。四个入口统一成「一句话说明 + 预览并复制」，点开是同一个弹窗组件，措辞与交互一致。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q1" value="乙 · 统一 AI 分析 Tab">
+          <span class="o-body">
+            <span class="o-t">乙 · 统一 AI 分析 Tab<span class="cost-chip">前端 ~1.5 天</span></span>
+            <span class="o-d">AI 能力有固定位置，方便对外介绍（README 里能截一张图说清）。代价：导航从 10 个变 11 个，且用户看着选基的缺口却要跳到别的 Tab 才能分析。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q1" value="丙 · 就地入口 + 设置页汇总">
+          <span class="o-body">
+            <span class="o-t">丙 · 甲+乙 组合<span class="cost-chip">前端 ~2 天</span></span>
+            <span class="o-d">两种习惯都覆盖，但同一个能力有两处入口要一起维护。</span>
+          </span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">四、点开之后长什么样（E2）</h2>
+
+    <div class="row">
+      <div class="wcol wide">
+        <div class="cap"><span class="no">E2</span>预览弹窗 —— 本稿的核心<span class="tag-new">新增</span></div>
+        <div class="capsub">三件事必须当场说清：会发送什么 · 会得到什么 · 去哪粘</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="body" style="background:#e8ecf2">
+            <div class="modal-mock">
+              <div style="font-size:13px;font-weight:800;margin-bottom:3px">让 AI 分析你的配置缺口</div>
+              <div style="font-size:10.5px;color:var(--muted);line-height:1.7;margin-bottom:10px">
+                工具不会自己联网问 AI。下面这段文字由你复制后，粘贴到 Claude 或 ChatGPT 的对话框里。
+              </div>
+
+              <div style="display:flex;gap:8px;margin-bottom:9px;font-size:10px">
+                <div style="flex:1;background:#f4f7fa;border-radius:7px;padding:7px 9px">
+                  <b style="font-size:10.5px">① 会发送什么</b><br>
+                  <span style="color:var(--muted)">19 个行业缺口 + 你的 4 个问卷答案 + 7 只持仓的分类占比<br>
+                  <b style="color:#2f7d58">不含</b>金额、账户、姓名</span>
+                </div>
+                <div style="flex:1;background:#f4f7fa;border-radius:7px;padding:7px 9px">
+                  <b style="font-size:10.5px">② 会得到什么</b><br>
+                  <span style="color:var(--muted)">该优先补哪 2-3 个方向、每个方向大致配多少、<br>分几次买入、要避开什么</span>
+                </div>
+                <div style="flex:1;background:#f4f7fa;border-radius:7px;padding:7px 9px">
+                  <b style="font-size:10.5px">③ 去哪粘</b><br>
+                  <span style="color:var(--muted)">claude.ai 或 chatgpt.com<br>免费账号即可</span>
+                </div>
+              </div>
+
+              <div style="font-size:10px;color:var(--muted);font-weight:800;margin-bottom:4px">提示词预览（可滚动查看全文）</div>
+              <div style="background:#fbfdff;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-family:monospace;font-size:9.5px;line-height:1.75;max-height:120px;overflow:hidden;color:var(--ink-2)">
+                # 基金配置缺口分析请求<br><br>
+                我用一个本地工具把自己的基金持仓穿透到了底层行业，下面是整理好的数据快照，<br>
+                截至 2026-07-30。请基于这些数据回答最后的问题。<br><br>
+                ## 1. 我的持仓结构<br>
+                总市值 21.3 万元，7 只基金：债券型 72.3% / 混合型 15.9% / 股票型 8.8% / QDII 3.0%<br><br>
+                ## 2. 穿透后的行业暴露（前 10）<br>
+                | 行业 | 当前暴露 | 与 10% 基准的差 |<br>
+                | 通信设备 | 7.78% | −2.22% |<br>
+                | 其他电子Ⅱ | 5.04% | −4.96% |　…<br><br>
+                ## 3. 我的偏好<br>
+                - 方向：让工具按缺口判断　- 波动承受：中<br>
+                - 持有期：3 年以上　- 可接受与现有持仓重叠：是<br><br>
+                ## 4. 请回答<br>
+                1. 这 19 个「缺口」里，哪 2-3 个值得优先补？为什么？<br>
+                2. 我的债券占比 72.3%，对 3 年以上的持有期是否过于保守？<br>
+                3. …
+              </div>
+
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:11px">
+                <span style="font-size:10px;color:var(--muted)">约 1,200 字 · 不含任何金额与账户信息</span>
+                <span>
+                  <span class="btn" style="font-size:10.5px">查看全文</span>
+                  <span class="btn pri" style="font-size:10.5px">复制并打开 Claude</span>
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dq" id="Q2" data-q="Q2" data-title="导出内容做到什么程度">
+      <div class="dq-hd"><span class="dq-id">Q2</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">导出的内容要做到什么程度？</div>
+      <div class="dq-sub">现状是原始 JSON / 未渲染的模板。要变成上面预览里那样的完整 prompt，需要在 Go 里补渲染逻辑（Python 版的 <code>ai_prompts.py</code> 有现成实现可参照，含持股表、peer 对比、PE 百分位、择时信号的构建）。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q2" value="完整 prompt：背景 + 结构化数据 + 具体提问">
+          <span class="o-body">
+            <span class="o-t">完整 prompt（背景 + 数据 + 提问）<span class="rec-chip">我建议</span><span class="cost-chip">后端 ~1.5 天</span></span>
+            <span class="o-d">按 Python 原版的规格补齐渲染：数字格式化、中文分类名、markdown 表格、结尾带 3-4 个具体问题。<b>这是「工具的独有价值」所在</b> —— 别人问 AI 只能空口描述，你能给出穿透后的行业暴露和 peer 对比。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q2" value="只修数据格式，不加指令与提问">
+          <span class="o-body">
+            <span class="o-t">只修数据格式<span class="cost-chip">后端 ~0.5 天</span></span>
+            <span class="o-d">把 JSON 换成可读的 markdown 表格、修掉 7.1899999999999995 这类浮点数，但不加指令和提问。省事，但用户粘过去还是得自己想问什么。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q2" value="完整 prompt + 保留纯数据导出（次级入口）">
+          <span class="o-body">
+            <span class="o-t">完整 prompt + 保留纯数据导出<span class="cost-chip">后端 ~2 天</span></span>
+            <span class="o-d">主按钮给完整 prompt，「⋯」菜单里保留 JSON/CSV 导出给想自己处理的人。多一条路要维护，但对开发者型用户友好。</span>
+          </span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+
+    <div class="dq" id="Q3" data-q="Q3" data-title="要不要直达 AI 网站">
+      <div class="dq-hd"><span class="dq-id">Q3</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">复制之后，要不要直接帮用户打开 AI 网站？</div>
+      <div class="dq-sub">「粘贴到 Claude 即可」这句话假设了用户知道 Claude 是什么、在哪。<b>这是当前动线断得最狠的一处</b>。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q3" value="复制后自动打开新标签页（可选 Claude / ChatGPT）">
+          <span class="o-body">
+            <span class="o-t">复制后自动打开新标签页<span class="rec-chip">我建议</span><span class="cost-chip">前端 ~2 小时</span></span>
+            <span class="o-d">按钮写「复制并打开 Claude」，点了就复制 + 新窗口打开 claude.ai，用户只需 Cmd+V。旁边给一个小的「用 ChatGPT」备选。这是唯一一处工具会主动打开外部网站的地方，写在按钮文字里，不算偷偷跳转。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q3" value="只复制，旁边给可点的链接">
+          <span class="o-body">
+            <span class="o-t">只复制，旁边给链接<span class="cost-chip">前端 ~1 小时</span></span>
+            <span class="o-d">更克制，不擅自打开浏览器标签。代价是多一步，且不点链接的用户仍然不知道去哪。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q3" value="只复制，不给任何外链">
+          <span class="o-body">
+            <span class="o-t">只复制，不给外链</span>
+            <span class="o-d">最保守。适合「不想让工具跟任何外部服务产生关联」的立场，但用户体验最差。</span>
+          </span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">五、第一次怎么教会用户（E3）</h2>
+
+    <div class="row">
+      <div class="wcol">
+        <div class="cap"><span class="no">E3-甲</span>常驻说明条<span class="tag-new">新增</span></div>
+        <div class="capsub">入口旁边永远有一句话，不依赖用户记得</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="body">
+            <div class="panelbox" style="border-left:3px solid var(--app)">
+              <div style="font-size:11.5px;line-height:1.8">
+                <b>AI 分析怎么用</b>　<span style="color:var(--muted)">工具把你的数据整理成提示词 → 你复制 → 粘到 Claude/ChatGPT → AI 给分析。
+                工具本身不联网问 AI，你的持仓金额也不会被写进提示词。</span>
+              </div>
+            </div>
+            <div class="note-in-frame">优点：永远看得见，新用户老用户都不会漏<br>代价：占版面，老用户会觉得啰嗦（可加「不再显示」）</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wcol">
+        <div class="cap"><span class="no">E3-乙</span>首次点击时的三步引导<span class="tag-new">新增</span></div>
+        <div class="capsub">第一次点 AI 入口时弹一次，之后不再出现</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="body" style="background:#e8ecf2">
+            <div class="modal-mock">
+              <div style="font-size:12.5px;font-weight:800;margin-bottom:9px">AI 分析是怎么工作的</div>
+              <div style="display:flex;gap:7px;font-size:10px;margin-bottom:10px">
+                <div style="flex:1;text-align:center;background:#f4f7fa;border-radius:7px;padding:9px 7px">
+                  <div style="width:22px;height:22px;border-radius:50%;background:var(--app);color:#fff;line-height:22px;margin:0 auto 5px;font-weight:800">1</div>
+                  工具整理你的数据<br>成一段提示词</div>
+                <div style="flex:1;text-align:center;background:#f4f7fa;border-radius:7px;padding:9px 7px">
+                  <div style="width:22px;height:22px;border-radius:50%;background:var(--app);color:#fff;line-height:22px;margin:0 auto 5px;font-weight:800">2</div>
+                  你复制，粘到<br>Claude / ChatGPT</div>
+                <div style="flex:1;text-align:center;background:#f4f7fa;border-radius:7px;padding:9px 7px">
+                  <div style="width:22px;height:22px;border-radius:50%;background:var(--app);color:#fff;line-height:22px;margin:0 auto 5px;font-weight:800">3</div>
+                  AI 给出分析<br>你自己决定买不买</div>
+              </div>
+              <div style="font-size:10px;color:var(--muted);line-height:1.7;background:#f2faf6;border-radius:7px;padding:7px 9px">
+                🔒 工具不会自己联网问 AI，也不会把你的<b>持仓金额</b>写进提示词 —— 只发送占比与分类。
+              </div>
+              <div style="text-align:right;margin-top:10px"><span class="btn pri" style="font-size:10.5px">明白了，继续</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dq" id="Q4" data-q="Q4" data-title="怎么教会用户用这个功能">
+      <div class="dq-hd"><span class="dq-id">Q4</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">第一次使用怎么教？</div>
+      <div class="dq-sub">「不知道怎么玩」的核心是<b>没人告诉他这三步</b>。注意：E2 的预览弹窗本身已经解释了一部分，这道题决定要不要再加一层。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q4" value="甲 · 常驻说明条（每个入口旁一句话）">
+          <span class="o-body">
+            <span class="o-t">甲 · 常驻说明条<span class="rec-chip">我建议</span><span class="cost-chip">前端 ~3 小时</span></span>
+            <span class="o-d">配合 E2 的预览弹窗已经够了：入口旁一句话说清「这是干什么的」，点开弹窗说清「发什么、得什么、去哪粘」。不额外加弹窗，不打断。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q4" value="乙 · 首次点击时三步引导弹窗">
+          <span class="o-body">
+            <span class="o-t">乙 · 首次三步引导<span class="cost-chip">前端 ~0.5 天</span></span>
+            <span class="o-d">最清楚，一次讲透整个模式（含隐私边界）。代价是多一次点击，且要记住「已看过」的状态。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q4" value="甲 + 乙 都做">
+          <span class="o-body">
+            <span class="o-t">甲 + 乙 都做<span class="cost-chip">前端 ~1 天</span></span>
+            <span class="o-d">首次引导讲透，之后常驻说明兜底。信息最充分，但对老用户略显唠叨。</span>
+          </span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">六、AI 答完之后呢（闭环，E4）</h2>
+    <div class="card">
+      这是目前<b>完全没有</b>的一段：用户拿到 AI 的分析后，工具里没有任何位置承接它。
+      分析结果留在 Claude 的对话里，下次打开工具就找不到了 ——
+      而这个工具的定位恰恰是「决策助手」，决策依据理应能留档。
+    </div>
+
+    <div class="row">
+      <div class="wcol wide">
+        <div class="cap"><span class="no">E4</span>把 AI 的回答贴回来存档<span class="tag-new">新增</span></div>
+        <div class="capsub">同一个弹窗的第二步：粘贴 AI 的回答，与本次数据快照一起存进决策记录</div>
+        <div class="win">
+          <div class="bar"><i></i><i></i><i></i><span class="url">localhost:8000</span></div>
+          <div class="body" style="background:#e8ecf2">
+            <div class="modal-mock">
+              <div style="display:flex;gap:0;border-bottom:1px solid var(--line);margin-bottom:10px;font-size:11px">
+                <span style="padding:6px 12px;color:var(--muted)">① 复制提示词</span>
+                <span style="padding:6px 12px;color:var(--app);border-bottom:2px solid var(--app);font-weight:800;margin-bottom:-1px">② 贴回 AI 的结论</span>
+              </div>
+              <div style="font-size:10.5px;color:var(--muted);line-height:1.7;margin-bottom:8px">
+                把 AI 的回答粘在这里，会和本次的数据快照一起存进「决策」Tab —— 以后回看时能知道当时是基于什么做的判断。
+              </div>
+              <div style="background:#fff;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:10px;color:var(--muted);min-height:64px">
+                粘贴 AI 的分析结论…
+              </div>
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px">
+                <span style="font-size:10px;color:var(--muted)">可留空 —— 不想存档就直接关掉</span>
+                <span class="btn pri" style="font-size:10.5px">存入决策记录</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dq" id="Q5" data-q="Q5" data-title="要不要做闭环存档">
+      <div class="dq-hd"><span class="dq-id">Q5</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">AI 的回答要不要能贴回工具存档？</div>
+      <div class="dq-sub"><b>架构变更提醒：</b>要存的话需要新增一张表（或复用 decisions 表加字段）存「数据快照 + AI 结论 + 时间」。这是本稿唯一涉及落库的改动。<b>不做的代价</b>：AI 分析变成一次性消耗品，工具无法成为决策档案。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q5" value="做：贴回后存进决策记录">
+          <span class="o-body">
+            <span class="o-t">做，存进决策记录<span class="rec-chip">我建议</span><span class="cost-chip">后端 ~1 天 + 前端 ~0.5 天</span></span>
+            <span class="o-d">「决策」Tab 现在是空的（0 条），正缺一个自然的写入来源。存下「当时的数据 + AI 的建议 + 我最后做了什么」，几个月后回看才知道判断对不对 —— 这才配得上「决策助手」。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q5" value="先不做，本轮只修导出与引导">
+          <span class="o-body">
+            <span class="o-t">先不做<span class="rec-chip">范围最小</span><span class="cost-chip">零额外成本</span></span>
+            <span class="o-d">本轮只把「导出坏了」和「不知道怎么玩」解决掉，闭环留到下一轮。改动范围清晰，风险最低。</span>
+          </span></label>
+        <label class="dq-opt"><input type="radio" name="Q5" value="做，且能一键转成买入计划">
+          <span class="o-body">
+            <span class="o-t">做，且能转成买入计划<span class="cost-chip">后端 ~2 天 + 前端 ~1 天</span></span>
+            <span class="o-d">再往前一步：从 AI 结论里让用户勾选要执行的部分，直接生成决策记录（含止盈止损触发条件）。最完整，但工作量翻倍，且要设计「从自然语言里提取要点」的交互。</span>
+          </span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">七、涉及的改动与架构变更</h2>
+    <div class="card">
+      <b>后端：</b><br>
+      ① <code>GetFundAIThemePrompt</code> 补渲染 —— 现在是 <code>ReadFile</code> 原样返回，
+      占位符 <code>{seed_name}</code> 全未替换，且把 484 字开发者注释一起返回给用户。
+      参照 Python 的 <code>render_theme_analysis_prompt</code>（含持股表 / peer 对比 / PE 百分位 / 择时信号）。<br>
+      ② <code>ExportSelectorSession</code> 重写 —— 现在输出 <code>#Selector Session xxx</code> + 原始 JSON。<br>
+      ③ <code>GetAIContext</code> 增强 —— 现在只有数据没有指令，分类是英文 bond/equity。<br>
+      ④ 新增统一的 prompt 渲染层，四个入口共用（数字格式化、中文分类名、markdown 表格）。<br><br>
+
+      <b>架构变更（Gate 要求点明）：</b><br>
+      · 若 Q5 选「做」→ <b>新增落库</b>：存数据快照 + AI 结论（新表或 decisions 加字段），需你确认。<br>
+      · 若 Q5 选「先不做」→ <b>不涉及任何架构变更</b>，纯改渲染与前端。<br>
+      · 若 Q3 选「自动打开」→ 工具会主动打开外部网站（claude.ai），行为写在按钮文字里。<br><br>
+
+      <b>隐私边界（无论怎么选都要守）：</b>提示词里<b>不含持仓金额、账户信息</b>，只含占比与分类。
+      预览弹窗里明确写出这一点 —— 用户敢用的前提是知道发出去的是什么。
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">八、本稿不涉及分享</h2>
+    <div class="card">
+      sanhu 是本地运行的桌面 Web 工具，不是微信小程序，没有分享卡片这一层；
+      且本稿处理的是用户真实持仓数据，本就不应有对外分享入口。
+      写在这里是为了把「漏了」和「刻意不做」区分开。
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">九、决策汇总与提交</h2>
+    <div class="card">
+      <div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:4px">你的决策汇总</div>
+      <div style="font-size:12.5px;margin-bottom:14px">随上面的作答实时更新。<b>没答完也能复制</b> —— 未决策的会标成「未答」。</div>
+      <div id="sumList"></div>
+
+      <div style="font-size:13px;font-weight:800;color:var(--ink);margin:18px 0 0">粘给 Claude 的内容</div>
+      <textarea class="dq-out" id="dqOut" readonly></textarea>
+      <div style="display:flex;gap:10px;margin-top:11px;flex-wrap:wrap">
+        <button class="primary" id="btnCopyBottom" style="font-size:13.5px;font-weight:800;padding:10px 22px;border-radius:22px;border:1px solid var(--primary-deep);background:var(--primary-deep);color:#fff;cursor:pointer">复制答案</button>
+        <button id="btnNext2" style="font-size:13px;font-weight:700;padding:10px 18px;border-radius:22px;border:1px solid #c6d6e2;background:#fff;color:var(--ink-2);cursor:pointer">回到第一个未答 ↑</button>
+      </div>
+      <div class="copy-hint">复制后直接粘进聊天框发我即可。答案存在你本地浏览器，关掉页面不会丢。</div>
+    </div>
+
+    <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.9">
+      Gate（全绿才动代码）：所有帧编号+状态已定 · 五道题全部已定 · 流程图齐 ·
+      <b>架构变更（Q5 是否新增落库、Q3 是否主动打开外部网站）已在第七节点明并被确认</b>。
+    </div>
+  </section>
+
+  <div class="toast" id="toast">已复制</div>
+</div>
+
+<script>
+(function(){
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.dq'));
+  if (!cards.length) return;
+
+  var slug = (location.pathname.split('/').pop() || 'product-spec').replace(/\.html?$/i,'');
+  var KEY = 'dq::' + slug;
+
+  var titleOf = {};
+  cards.forEach(function(c){
+    titleOf[c.getAttribute('data-q')] = c.getAttribute('data-title') || c.getAttribute('data-q');
+  });
+
+  var byNum = cards.map(function(c){ return c.getAttribute('data-q'); })
+                   .sort(function(a,b){ return (+a.replace(/\D/g,'')) - (+b.replace(/\D/g,'')); });
+  var byDom = cards.map(function(c){ return c.getAttribute('data-q'); });
+
+  var state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e) { state = {}; }
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){} }
+  function get(id){ return state[id] || { v:'', note:'' }; }
+  function esc(s){ return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+
+  function render(){
+    var done = 0;
+    cards.forEach(function(card){
+      var id = card.getAttribute('data-q'), s = get(id), ok = !!s.v;
+      if (ok) done++;
+      card.classList.toggle('answered', ok);
+      card.querySelector('.dq-state').textContent = ok ? ('已定：' + s.v) : '待你决策';
+      card.querySelectorAll('.dq-opt').forEach(function(opt){
+        var r = opt.querySelector('input');
+        r.checked = (r.value === s.v);
+        opt.classList.toggle('sel', r.checked);
+      });
+      var ta = card.querySelector('.dq-note textarea');
+      if (ta && ta.value !== s.note) ta.value = s.note || '';
+    });
+
+    var pt = document.getElementById('pTxt');
+    pt.innerHTML = '<em>' + done + '</em> / ' + cards.length + ' 已决策';
+    pt.classList.toggle('all-done', done === cards.length);
+    document.getElementById('pFill').style.width = (done / cards.length * 100) + '%';
+
+    var rail = document.getElementById('dqRail');
+    rail.innerHTML = '';
+    byNum.forEach(function(id){
+      var d = document.createElement('div');
+      d.className = 'rdot' + (get(id).v ? ' done' : '');
+      d.textContent = id;
+      d.title = titleOf[id] + (get(id).v ? '：' + get(id).v : '（待决策）');
+      d.onclick = function(){ jumpTo(id); };
+      rail.appendChild(d);
+    });
+
+    document.querySelectorAll('h2.sec').forEach(function(h){
+      var old = h.querySelector('.sec-badge'); if (old) old.remove();
+      var sec = h.closest('section'); if (!sec) return;
+      var inSec = Array.prototype.slice.call(sec.querySelectorAll('.dq'));
+      if (!inSec.length) return;
+      var open = inSec.filter(function(c){ return !get(c.getAttribute('data-q')).v; }).length;
+      var b = document.createElement('span');
+      b.className = 'sec-badge' + (open ? '' : ' done');
+      b.innerHTML = '<i></i>' + (open ? (open + ' 个待你决策') : '本节已决策完');
+      h.appendChild(b);
+    });
+
+    renderSummary(done);
+  }
+
+  function renderSummary(done){
+    var list = document.getElementById('sumList');
+    if (list) {
+      list.innerHTML = '';
+      byNum.forEach(function(id){
+        var s = get(id);
+        var row = document.createElement('div');
+        row.className = 'dqsum-row' + (s.v ? ' done' : '');
+        row.innerHTML = '<div class="s-id">' + id + '</div>' +
+          '<div class="s-q">' + esc(titleOf[id]) + '</div>' +
+          '<div class="s-a">' + (s.v ? esc(s.v) : '未答') +
+          (s.note ? '<span class="s-note">' + esc(s.note) + '</span>' : '') + '</div>';
+        row.onclick = function(){ jumpTo(id); };
+        list.appendChild(row);
+      });
+    }
+    var out = document.getElementById('dqOut');
+    if (!out) return;
+    var title = (document.querySelector('h1') || {}).textContent || slug;
+    var lines = ['【' + title.trim() + ' · 决策回复】'];
+    var missing = [];
+    byNum.forEach(function(id){
+      var s = get(id);
+      if (s.v) lines.push(id + ' = ' + s.v + (s.note ? '（补充：' + s.note + '）' : ''));
+      else missing.push(id);
+    });
+    if (missing.length) lines.push('', '未答：' + missing.join('、'));
+    lines.push('', '（' + done + '/' + cards.length + ' 已决策）');
+    out.value = lines.join('\n');
+  }
+
+  function jumpTo(id){
+    var el = document.getElementById(id); if (!el) return;
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+    el.style.transition = 'box-shadow .25s';
+    el.style.boxShadow = '0 0 0 4px rgba(233,162,59,.32)';
+    setTimeout(function(){ el.style.boxShadow=''; }, 900);
+  }
+
+  function nextOpen(){
+    var open = byDom.filter(function(id){ return !get(id).v; });
+    if (!open.length) { toast('都答完了，点「复制答案」发我'); return; }
+    var y = window.scrollY + 120;
+    var below = open.filter(function(id){ return document.getElementById(id).offsetTop > y; });
+    jumpTo(below.length ? below[0] : open[0]);
+  }
+
+  cards.forEach(function(card){
+    var id = card.getAttribute('data-q');
+    card.querySelectorAll('.dq-opt input').forEach(function(r){
+      r.addEventListener('change', function(){
+        var s = get(id); s.v = r.value; state[id] = s; save(); render();
+      });
+    });
+    var ta = card.querySelector('.dq-note textarea');
+    if (ta) ta.addEventListener('input', function(){
+      var s = get(id); s.note = ta.value.trim(); state[id] = s; save();
+      renderSummary(byNum.filter(function(x){ return !!get(x).v; }).length);
+    });
+  });
+
+  var tId;
+  function toast(msg){
+    var t = document.getElementById('toast'); if (!t) return;
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(tId); tId = setTimeout(function(){ t.classList.remove('show'); }, 1900);
+  }
+
+  function copyOut(){
+    var ta = document.getElementById('dqOut'); if (!ta) return;
+    function fallback(){
+      ta.removeAttribute('readonly'); ta.select();
+      try { document.execCommand('copy'); toast('已复制，粘给我即可'); }
+      catch(e){ toast('复制失败，请手动全选下方文本'); }
+      ta.setAttribute('readonly','readonly');
+      window.getSelection().removeAllRanges();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(ta.value).then(function(){ toast('已复制，粘给我即可'); }, fallback);
+    } else fallback();
+  }
+
+  function bind(id, fn){ var el = document.getElementById(id); if (el) el.onclick = fn; }
+  bind('btnNext', nextOpen); bind('btnNext2', nextOpen);
+  bind('btnCopyTop', copyOut); bind('btnCopyBottom', copyOut);
+  bind('btnReset', function(){
+    if (!confirm('清空所有已作答的决策？')) return;
+    state = {}; save(); render(); toast('已清空');
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
