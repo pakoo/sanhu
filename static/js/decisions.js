@@ -684,57 +684,18 @@
         contentEl.style.display = 'block';
     }
 
-    window.openAiThemePrompt = async function () {
+    // 赛道分析走统一的 AI 弹窗（ai.js）。旧实现自己维护一套 DOM 与文案，
+    // 与其他入口各说一套；元信息（version / last_verified_date）是给开发看的，
+    // 不该出现在用户面前。
+    // 注意：这个按钮埋在「决策弹窗 → 同主题对比 → 折叠区」三层之下，
+    // 所以基金详情弹窗里也放了一个同场景入口（见 app.js renderFundModalAI）。
+    window.openAiThemePrompt = function () {
         const code = getDecisionModalCode();
         if (!code) {
             decisionsToast('请先填写基金代码');
             return;
         }
-        const modal = document.getElementById('aiPromptModal');
-        const metaEl = document.getElementById('aiPromptMeta');
-        const textEl = document.getElementById('aiPromptText');
-        if (!modal || !metaEl || !textEl) return;
-
-        modal.style.display = 'flex';
-        metaEl.textContent = '加载中...';
-        textEl.value = '';
-
-        try {
-            const res = await fetch(`/api/funds/${code}/ai-prompts/theme-analysis`);
-            const json = await res.json();
-            if (!res.ok || json.status !== 'ok') throw new Error(json.detail || json.msg || '加载失败');
-            const data = json.data || {};
-            const prompt = data.prompt || data.rendered_prompt || '';
-            const metaBits = [];
-            if (data.version) metaBits.push(`version ${data.version}`);
-            if (data.last_verified_date) metaBits.push(`last_verified_date ${data.last_verified_date}`);
-            if (data.char_count != null) metaBits.push(`char_count ${data.char_count}`);
-            if (data.stale) metaBits.push('⚠️ stale');
-            metaEl.textContent = metaBits.join(' · ') || '无元信息';
-            textEl.value = prompt;
-        } catch (e) {
-            metaEl.textContent = `加载失败: ${e.message}`;
-            textEl.value = '';
-        }
-    };
-
-    window.closeAiPromptModal = function () {
-        const modal = document.getElementById('aiPromptModal');
-        if (modal) modal.style.display = 'none';
-    };
-
-    window.copyAiPrompt = async function () {
-        const text = document.getElementById('aiPromptText')?.value || '';
-        if (!text) {
-            decisionsToast('没有可复制的 prompt');
-            return;
-        }
-        try {
-            await navigator.clipboard.writeText(text);
-            decisionsToast('Prompt 已复制到剪贴板');
-        } catch (e) {
-            decisionsToast(`复制失败: ${e.message}`, 3000);
-        }
+        aiOpenPrompt('theme_analysis', { code });
     };
 
     async function loadPositionSizing(code) {

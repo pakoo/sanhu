@@ -2,10 +2,8 @@ package handler
 
 import (
 	"database/sql"
-	"fmt"
 	"math"
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -94,22 +92,5 @@ func (h *Handler) RefreshPeerRanks(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "ok", "message": "peer ranks刷新完成"})
 }
 
-func (h *Handler) GetAIContext(c *gin.Context) {
-	holdings, total, err := loadPortfolioHoldings(h.DB)
-	if err != nil {
-		fail(c, http.StatusInternalServerError, err.Error())
-		return
-	}
-	lines := []string{fmt.Sprintf("当前组合总市值约 %.2f 元。", total)}
-	for i, item := range holdings {
-		if i >= 5 {
-			break
-		}
-		name := strings.TrimSpace(item.Name)
-		if name == "" {
-			name = item.Code
-		}
-		lines = append(lines, fmt.Sprintf("%s（%s）占用约 %.2f 元，分类 %s。", name, item.Code, item.Value, item.Category))
-	}
-	ok(c, gin.H{"context": strings.Join(lines, "\n"), "generated_at": time.Now().Format("2006-01-02 15:04")})
-}
+// GetAIContext 与 currentRiskLevel 已移至 ai_prompts.go —— 那里是 AI 提示词的统一归口，
+// 留在这里会和新的场景化实现重复声明。

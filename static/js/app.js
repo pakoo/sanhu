@@ -125,6 +125,7 @@ function switchTab(tab) {
     if (tab === 'simulations' && typeof simInit === 'function') simInit();
     if (tab === 'settings') loadSettings();
     if (tab === 'market') loadMarket(false);
+    if (tab === 'ai' && typeof aiLoadCenter === 'function') aiLoadCenter();
     // 模块使用说明区
     if (typeof initModuleGuide === 'function') initModuleGuide(tab);
 }
@@ -302,7 +303,8 @@ async function loadDashboard() {
         renderReturnChart(portfolioData);
         renderHoldingsTable(portfolioData);
         populateBacktestFunds(portfolioData);
-        document.getElementById('aiContextBar').style.display = 'block';
+        // AI 入口（Q3 = 甲）：轻按钮，不抢真实数据的位置
+        renderAIInlineEntry('aiContextBar', 'portfolio_checkup', '让 AI 通读这份组合');
     } catch (e) {
         console.error('加载持仓失败:', e);
     }
@@ -1021,10 +1023,13 @@ async function showFundDetail(code) {
         const detail = await API.getHoldingDetail(code);
         if (detail.error) {
             document.getElementById('modalContent').innerHTML = `<p>${detail.error}</p>`;
+            document.getElementById('modalAIActions').innerHTML = '';
+            document.getElementById('modalAINotes').innerHTML = '';
             return;
         }
 
         document.getElementById('modalTitle').textContent = detail.name;
+        renderFundModalAI(code);
 
         const profitClass = detail.profit >= 0 ? 'text-profit' : 'text-loss';
         const sign = detail.profit >= 0 ? '+' : '';
@@ -1190,6 +1195,8 @@ async function loadHoldings() {
             API.getIndustryTotal(),
         ]);
         holdingsData = { overlap, industry };
+        // 穿透数据是工具最独特的产出，这里也挂一个就地入口
+        renderAIInlineEntry('lookThroughAIBar', 'holdings_overlap', '让 AI 看重叠与集中度');
         renderDiversificationScore(overlap);
         renderOverlapStocks(overlap);
         renderIndustryBreakdown(industry);
@@ -1389,37 +1396,55 @@ function renderValuationSignals(data) {
         </div>`;
 }
 
-// === v2.0: AI 持仓解读 ===
-async function openAIContext() {
-    document.getElementById('aiContextModal').style.display = 'flex';
-    document.getElementById('aiContextLoading').style.display = 'inline-block';
-    document.getElementById('aiContextText').value = '';
-    document.getElementById('copyContextBtn').textContent = '复制';
+// renderFundModalAI 基金详情弹窗底部的 AI 动作区（产品稿 E2）+ 这只基金的历史结论
+async function renderFundModalAI(code) {
+    const box = document.getElementById('modalAIActions');
+    if (box) {
+        box.innerHTML = `
+            <span class="ai-fund-actions-label">带着这只基金的数据去问 AI：</span>
+            <button class="ai-btn solid" data-ai-scene="fund_addposition" data-ai-code="${code}">📈 该不该加仓这只</button>
+            <button class="ai-btn" data-ai-scene="theme_analysis" data-ai-code="${code}">🛰️ 赛道横评（找 peer）</button>`;
+        if (typeof aiBindInline === 'function') aiBindInline();
+    }
 
+    // 关联视图：把旧结论和现在的数据摆在一起，让当时的判断变成可验证的
+    const notesBox = document.getElementById('modalAINotes');
+    if (!notesBox) return;
+    notesBox.innerHTML = '';
     try {
-        const result = await API.getAIContext();
-        document.getElementById('aiContextText').value = result.context || '';
-    } catch (e) {
-        document.getElementById('aiContextText').value = '生成失败，请检查网络或重试。';
-    }
-    document.getElementById('aiContextLoading').style.display = 'none';
+        const res = await fetch(`/api/ai/notes?code=${encodeURIComponent(code)}&limit=5`);
+        const body = await res.json();
+        const notes = (body.data && body.data.notes) || [];
+        if (!notes.length) return;
+        notesBox.innerHTML = `
+            <div class="ai-fund-notes">
+                <div class="ai-fund-notes-t">💬 这只基金的历史 AI 结论（${notes.length}）</div>
+                ${notes.map(n => {
+                    const now = n.now || {};
+                    const dev = typeof now.deviation_pct === 'number'
+                        ? `现在偏离 20 日均线 ${now.deviation_pct > 0 ? '+' : ''}${now.deviation_pct.toFixed(1)}%` : '';
+                    return `<div class="ai-fund-note">
+                        <b>${n.created_at.slice(0, 10)} · ${n.scene_title}</b>
+                        <div>${(n.summary || n.content.slice(0, 80) + '…').replace(/</g, '&lt;')}</div>
+                        ${dev ? `<div class="ai-fund-note-now">当时的判断 vs 现在：${dev}</div>` : ''}
+                    </div>`;
+                }).join('')}
+            </div>`;
+    } catch (e) { /* 台账拿不到不影响看基金详情 */ }
 }
 
-function closeAIContextModal(event) {
-    if (event.target.id === 'aiContextModal') {
-        document.getElementById('aiContextModal').style.display = 'none';
-    }
+// === AI 就地入口（产品稿 Q3 = 甲：卡片标题旁的轻按钮）===
+// 全站只有这一处生成入口按钮，样式和文案统一；点击后走 ai.js 的统一弹窗。
+function renderAIInlineEntry(containerId, scene, label, code) {
+    const el = document.getElementById(containerId);
+    if (!el) return;
+    el.innerHTML = `<button class="ai-btn inline" data-ai-scene="${scene}"${code ? ` data-ai-code="${code}"` : ''}>🤖 ${label}</button>`;
+    el.style.display = 'block';
+    if (typeof aiBindInline === 'function') aiBindInline();
 }
 
-function copyAIContext() {
-    const text = document.getElementById('aiContextText').value;
-    if (!text) return;
-    navigator.clipboard.writeText(text).then(() => {
-        const btn = document.getElementById('copyContextBtn');
-        btn.textContent = '已复制!';
-        setTimeout(() => { btn.textContent = '复制'; }, 2000);
-    });
-}
+// 旧入口名保留：总览页曾经的「AI持仓解读」按钮可能还有人从书签点进来
+function openAIContext() { aiOpenPrompt('portfolio_checkup'); }
 
 // === 交易记录 ===
 function openTxModal() {

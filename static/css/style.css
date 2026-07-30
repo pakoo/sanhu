@@ -803,3 +803,181 @@ body {
 .filter-chip.mixed { background: #fef3c7; color: #92400e; border-color: #fde68a; }
 .filter-chip.qdii  { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
 .filter-chip.inactive { opacity: .35; }
+
+/* ============================================================================
+   AI 分析（产品稿 docs/product-specs/ai-everywhere.html）
+   Q3 = 甲+丙：轻按钮为主 + 全局悬浮球兜底
+   AI 相关一律用主色靛紫，与红涨绿跌的行情色彻底分开 —— 避免用户把
+   「AI 入口」误读成涨跌信号。
+   ============================================================================ */
+
+/* 顶部导航里的 AI Tab：未选中时用主色稍作强调，但不做成撞色按钮。
+   选中态必须让位给 .tab-btn.active 的白字 —— 写 color:inherit 会让文字
+   变成深色叠在深色药丸上，整个标签看起来只剩一个 emoji（实测踩过）。 */
+.tab-btn-ai:not(.active) { color: var(--primary-dark); font-weight: 600; }
+
+/* 统一入口按钮（M1）：全站只有这一个样式 */
+.ai-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--primary-soft); color: var(--primary-dark);
+    border: 1px solid #d6d8fb; border-radius: 8px;
+    padding: 5px 12px; font-size: 12px; font-weight: 600;
+    cursor: pointer; white-space: nowrap; transition: .15s;
+    font-family: inherit;
+}
+.ai-btn:hover { background: #e4e6fc; }
+.ai-btn.solid {
+    background: linear-gradient(120deg, var(--primary), var(--primary-2));
+    color: #fff; border-color: transparent;
+}
+.ai-btn.solid:hover { filter: brightness(1.06); }
+.ai-btn.ghost { background: var(--card); color: var(--text-secondary); border-color: var(--border); font-weight: 500; }
+.ai-btn.ghost.danger:hover { color: var(--danger); border-color: #fecdd3; }
+.ai-btn.dis, .ai-btn:disabled { background: var(--bg-secondary); color: #aab2c8; border-color: var(--border); cursor: not-allowed; }
+.ai-btn.inline { font-size: 12.5px; padding: 6px 14px; }
+
+/* 卡片标题右侧挂轻按钮（Q3 甲）*/
+.card-title.ai-title-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+}
+
+/* AI 中心顶部说明条 */
+.ai-banner {
+    background: linear-gradient(120deg, var(--primary), var(--primary-2));
+    border-radius: var(--radius); color: #fff; padding: 14px 18px; margin-bottom: 16px;
+    display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+}
+.ai-banner-t { font-size: 14px; font-weight: 700; }
+.ai-banner-d { font-size: 12px; opacity: .88; margin-top: 4px; line-height: 1.75; max-width: 760px; }
+.ai-banner-asof { font-size: 11.5px; background: rgba(255,255,255,.2); border-radius: 16px; padding: 4px 12px; white-space: nowrap; }
+
+/* 场景网格 */
+.ai-group { margin-bottom: 14px; }
+.ai-group-count { font-size: 11px; color: var(--text-secondary); font-weight: 400; margin-left: 8px; }
+.ai-scene-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+.ai-scene {
+    background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+    box-shadow: var(--shadow-sm); padding: 13px 14px;
+    display: flex; flex-direction: column; gap: 6px; min-height: 132px;
+}
+.ai-scene.locked { opacity: .62; }
+.ai-scene-ic { font-size: 18px; line-height: 1.2; }
+.ai-scene-t { font-size: 13px; font-weight: 700; color: var(--text); }
+.ai-scene-d { font-size: 11.5px; color: var(--text-secondary); line-height: 1.7; flex: 1; }
+.ai-scene-ft { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.ai-rdy { font-size: 10px; font-weight: 700; border-radius: 5px; padding: 2px 7px; white-space: nowrap; }
+.ai-rdy.g { background: #e8f6ee; color: #2f7d58; }
+.ai-rdy.y { background: #fef3c7; color: #92400e; }
+.ai-rdy.w { background: var(--bg-secondary); color: #8b95ad; }
+
+/* 空态（H2）：没数据时不给「生成」，只给补数据的路 */
+.ai-empty-wrap { text-align: center; padding: 30px 20px 40px; }
+.ai-empty-icon { font-size: 38px; }
+.ai-empty-title { font-size: 16px; font-weight: 700; margin-top: 10px; }
+.ai-empty-desc { font-size: 12.5px; color: var(--text-secondary); line-height: 1.9; margin-top: 8px; }
+.ai-empty { padding: 24px; text-align: center; color: var(--text-secondary); font-size: 13px; }
+
+/* 统一提示词弹窗 */
+.ai-modal-hd { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; margin-bottom: 12px; }
+.ai-modal-meta { font-size: 11.5px; color: var(--text-secondary); line-height: 1.7; }
+.ai-gap-count { color: #92400e; }
+.ai-modal-tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+.ai-modal-tab {
+    background: none; border: none; border-bottom: 2px solid transparent;
+    padding: 8px 4px; margin-bottom: -1px; font-size: 13px; font-weight: 600;
+    color: var(--text-secondary); cursor: pointer; font-family: inherit;
+}
+.ai-modal-tab.active { color: var(--primary-dark); border-bottom-color: var(--primary); }
+
+.ai-dl-bar {
+    display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: var(--bg-secondary); border-radius: var(--radius-sm);
+    padding: 9px 13px; font-size: 12px; color: var(--text-secondary); margin-bottom: 10px;
+}
+.ai-dl-right { display: flex; align-items: center; gap: 12px; }
+.ai-redact { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer; }
+.ai-redact-hint { font-size: 11px; color: var(--text-secondary); }
+.ai-dl { background: #fafbff; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 13px; margin-bottom: 10px; }
+.ai-dl.warn { background: #fffaf0; border-color: #f0dcb8; }
+.ai-dl-h { font-size: 12px; font-weight: 700; margin-bottom: 5px; }
+.ai-dl-h.ok { color: #2f7d58; }
+.ai-dl-h.warn { color: #a8720f; }
+.ai-dl-li { display: flex; gap: 8px; align-items: baseline; font-size: 11.5px; line-height: 1.9; color: var(--text-secondary); }
+.ai-dl-li .s { flex: none; width: 16px; }
+
+.ai-pre-label { font-size: 12px; font-weight: 700; margin-bottom: 6px; }
+.ai-pre-text {
+    width: 100%; height: 300px; font-size: 12.5px; font-family: 'SF Mono', Menlo, monospace;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 12px; resize: vertical; line-height: 1.7; background: #fbfdff; color: var(--text);
+}
+.ai-modal-ft { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 14px; }
+.ai-ft-note { font-size: 11.5px; color: var(--text-secondary); line-height: 1.7; }
+.ai-copy-hint {
+    font-size: 11.5px; color: var(--text-secondary); line-height: 1.85;
+    background: var(--primary-soft); border-radius: var(--radius-sm); padding: 9px 12px; margin-top: 10px;
+}
+.ai-disclaimer { font-size: 11.5px; color: var(--text-secondary); margin-top: 10px; line-height: 1.7; }
+
+/* P3 数据不足态 */
+.ai-notready { background: #fffaf0; border: 1px solid #f0dcb8; border-radius: var(--radius-sm); padding: 16px 18px; }
+.ai-notready-title { font-size: 14px; font-weight: 700; color: #a8720f; margin-bottom: 6px; }
+.ai-notready-msg { font-size: 12.5px; color: var(--text-secondary); line-height: 1.9; }
+.ai-notready-hint { font-size: 11.5px; color: #a8720f; margin-top: 10px; line-height: 1.7; }
+
+/* 回填（R1）*/
+.ai-note-desc { font-size: 12.5px; color: var(--text-secondary); line-height: 1.85; margin-bottom: 10px; }
+.ai-note-text {
+    width: 100%; height: 220px; font-size: 12.5px; line-height: 1.7; font-family: inherit;
+    border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; resize: vertical;
+}
+.ai-note-summary {
+    width: 100%; margin-top: 10px; padding: 9px 12px; font-size: 12.5px; font-family: inherit;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+}
+
+/* 台账（R2）*/
+.ai-note-row {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 14px;
+    padding: 11px 0; border-bottom: 1px solid var(--border);
+}
+.ai-note-row:last-child { border-bottom: none; }
+.ai-note-t { font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.ai-note-code { font-size: 10.5px; font-weight: 600; background: var(--bg-secondary); color: var(--text-secondary); border-radius: 5px; padding: 1px 7px; }
+.ai-note-s { font-size: 12px; color: var(--text-secondary); line-height: 1.75; margin-top: 3px; }
+.ai-note-side { display: flex; align-items: center; gap: 8px; flex: none; }
+.ai-note-date { font-size: 11px; color: var(--text-secondary); white-space: nowrap; }
+.ai-notes-empty { font-size: 12.5px; color: var(--text-secondary); line-height: 1.85; padding: 8px 0; }
+
+/* 基金详情弹窗底部的 AI 动作区（E2）*/
+.ai-fund-actions {
+    display: flex; align-items: center; gap: 9px; flex-wrap: wrap;
+    margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border);
+}
+.ai-fund-actions-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+.ai-fund-actions:empty { display: none; }
+.ai-fund-notes { margin-top: 14px; background: var(--bg-secondary); border-radius: var(--radius-sm); padding: 11px 13px; }
+.ai-fund-notes-t { font-size: 12px; font-weight: 700; margin-bottom: 7px; }
+.ai-fund-note { font-size: 11.5px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 8px; }
+.ai-fund-note:last-child { margin-bottom: 0; }
+.ai-fund-note b { color: var(--text); }
+.ai-fund-note-now { color: var(--primary-dark); font-weight: 600; margin-top: 2px; }
+
+/* 全局悬浮球（Q3 丙）：滚动时半透明，免得长期挡住图表右下角 */
+.ai-fab {
+    position: fixed; right: 22px; bottom: 22px; z-index: 900;
+    width: 50px; height: 50px; border-radius: 50%; border: none; cursor: pointer;
+    background: linear-gradient(120deg, var(--primary), var(--primary-2));
+    color: #fff; font-size: 21px; box-shadow: var(--shadow-lg);
+    transition: transform .15s, opacity .2s; opacity: .82;
+}
+.ai-fab:hover { transform: scale(1.07); opacity: 1; }
+
+/* Toast */
+.ai-toast {
+    position: fixed; left: 50%; bottom: 90px; transform: translateX(-50%) translateY(12px);
+    background: rgba(27,35,52,.94); color: #fff; font-size: 13px; font-weight: 600;
+    padding: 11px 22px; border-radius: var(--radius-pill); z-index: 2000;
+    opacity: 0; pointer-events: none; transition: .22s; max-width: 84vw; text-align: center;
+}
+.ai-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }

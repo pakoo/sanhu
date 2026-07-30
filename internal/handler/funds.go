@@ -1,11 +1,9 @@
 package handler
 
 import (
-	"io/fs"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	sanhugo "github.com/pakoo/sanhu"
 	"github.com/pakoo/sanhu/internal/fetcher"
 	"github.com/pakoo/sanhu/internal/scoring"
 	"github.com/pakoo/sanhu/internal/selector"
@@ -161,11 +159,4 @@ func (h *Handler) GetFundPeers(c *gin.Context) {
 	ok(c, peers)
 }
 
-func (h *Handler) GetFundAIThemePrompt(c *gin.Context) {
-	content, err := fs.ReadFile(sanhugo.PromptsFS, "prompts/theme_analysis.md")
-	if err != nil {
-		fail(c, http.StatusInternalServerError, err.Error())
-		return
-	}
-	ok(c, gin.H{"prompt": string(content)})
-}
+// GetFundAIThemePrompt 见 ai_prompts.go —— 那里做完整渲染，不再原样返回模板

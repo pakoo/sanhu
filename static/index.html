@@ -95,6 +95,7 @@
             <button class="tab-btn" onclick="switchTab('selector')">选基</button>
             <button class="tab-btn" onclick="switchTab('decisions')">决策</button>
             <button class="tab-btn" onclick="switchTab('simulations')">🧪 模拟盘</button>
+            <button class="tab-btn tab-btn-ai" onclick="switchTab('ai')">🤖 AI 分析</button>
             <button class="tab-btn" onclick="switchTab('settings')">设置</button>
         </div>
     </div>
@@ -116,12 +117,8 @@
 
             <div id="dashboardContent">
             <div class="summary-cards" id="summaryCards"></div>
-            <div id="aiContextBar" style="margin-bottom:16px;display:none;">
-                <button class="btn btn-primary" onclick="openAIContext()" style="gap:6px;">
-                    AI持仓解读
-                </button>
-                <span style="font-size:12px;color:var(--text-secondary);margin-left:10px;">生成可发给 Claude 的分析 prompt</span>
-            </div>
+            <!-- AI 就地入口（Q3 = 甲：轻按钮），内容由 app.js renderAIInlineEntry 渲染 -->
+            <div id="aiContextBar" style="margin-bottom:16px;display:none;"></div>
             <div class="grid-2">
                 <div class="card">
                     <div class="card-title">资产配置</div>
@@ -247,7 +244,9 @@
                 </div>
             </div>
             <div class="card">
-                <div class="card-title">风险预警</div>
+                <div class="card-title ai-title-row">风险预警
+                    <button class="ai-btn" data-ai-scene="risk_alerts">🤖 让 AI 解读这些告警</button>
+                </div>
                 <div id="riskAlerts"><div class="loading">加载中</div></div>
             </div>
             <div class="grid-2">
@@ -298,7 +297,9 @@
                 </div>
             </div>
             <div class="card">
-                <div class="card-title">调仓建议</div>
+                <div class="card-title ai-title-row">调仓建议
+                    <button class="ai-btn" data-ai-scene="rebalance_review">🤖 让 AI 审这份方案</button>
+                </div>
                 <div id="suggestions"><div class="loading">加载中</div></div>
             </div>
             <div class="card">
@@ -320,6 +321,8 @@
 
         <!-- Tab 5: 持仓透视 -->
         <div class="tab-content" id="tab-holdings">
+            <!-- AI 就地入口（Q3 = 甲：轻按钮）-->
+            <div id="lookThroughAIBar" style="margin-bottom:16px;"></div>
             <div class="summary-cards">
                 <div class="summary-card">
                     <div class="label">真实分散度</div>
@@ -345,7 +348,9 @@
 
             <div class="grid-2">
                 <div class="card">
-                    <div class="card-title">跨基金重叠股票</div>
+                    <div class="card-title ai-title-row">跨基金重叠股票
+                        <button class="ai-btn" data-ai-scene="holdings_overlap">🤖 让 AI 解读</button>
+                    </div>
                     <div id="overlapStocksList"><div class="loading">加载中...</div></div>
                 </div>
                 <div class="card">
@@ -396,16 +401,9 @@
                 <!-- 诊断缺口卡片 -->
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
                     <h3 style="font-size:16px;font-weight:600;color:var(--text);">系统诊断的配置缺口</h3>
-                    <div style="display:flex;gap:8px;">
-                        <button class="btn" onclick="selectorExportPrompt()" id="selectorExportBtn"
-                                style="font-size:13px;padding:6px 14px;background:#f8fafc;border:1px solid var(--border);">
-                            📋 导出 Claude 提示词
-                        </button>
-                        <button class="btn" onclick="selectorExportJSON()"
-                                style="font-size:13px;padding:6px 14px;background:#f8fafc;border:1px solid var(--border);">
-                            ⬇ 导出 JSON
-                        </button>
-                    </div>
+                    <button class="btn btn-primary" id="selectorExportBtn"
+                            onclick="openSelectorPrompt(window.selectorSessionIdForAI)"
+                            style="font-size:13px;padding:6px 14px;">让 AI 分析这份诊断</button>
                 </div>
                 <div id="selectorGapCards" style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:20px;"></div>
 
@@ -551,30 +549,8 @@
             </div>
         </div>
 
-        <!-- AI prompt 展示弹窗 -->
-        <div id="aiPromptModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:1300;align-items:center;justify-content:center;padding:20px;">
-            <div style="background:#fff;border-radius:16px;padding:20px;max-width:720px;width:100%;max-height:85vh;display:flex;flex-direction:column;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-                    <div style="font-size:16px;font-weight:700;">🤖 AI 赛道分析 Prompt</div>
-                    <button class="btn" onclick="closeAiPromptModal()" style="padding:6px 14px;background:#f8fafc;border:1px solid var(--border);">关闭</button>
-                </div>
-                <div id="aiPromptMeta" style="font-size:11px;color:var(--text-secondary);margin-bottom:8px;"></div>
-                <div class="ai-guide-block">
-                    <div class="ai-guide-title">📌 使用步骤</div>
-                    <ol class="ai-guide-steps">
-                        <li>点下方"📋 一键复制"</li>
-                        <li>打开 <strong><a href="https://claude.ai" target="_blank">Claude.ai</a></strong>（推荐）或 ChatGPT</li>
-                        <li>新建对话，粘贴内容，发送</li>
-                    </ol>
-                    <div class="ai-guide-model">💡 推荐使用 <strong>Claude Opus 4.6</strong>（指令遵从性更好，不容易忽略"用普通语言"的要求）。若 AI 回答仍有大量专业术语，在回复框追加：<em>"请把刚才的回答改成普通投资者能看懂的语言"</em></div>
-                    <div class="ai-guide-disclaimer">⚠️ 此 prompt 由工具根据真实数据生成，AI 回答仅供参考，不构成投资建议。最终决策由您执行。</div>
-                </div>
-                <textarea id="aiPromptText" readonly style="flex:1;min-height:280px;padding:12px;border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:12px;line-height:1.5;white-space:pre-wrap;resize:vertical;"></textarea>
-                <div style="display:flex;justify-content:flex-end;margin-top:12px;">
-                    <button class="btn btn-primary" onclick="copyAiPrompt()" style="padding:8px 20px;">📋 一键复制</button>
-                </div>
-            </div>
-        </div>
+        <!-- 赛道分析弹窗已合并进统一的 #aiPromptModal（见文件末尾）：
+             旧弹窗与新弹窗 id 相同会互相干扰，且里面有 claude.ai 外链，与 Q3「不给外链」冲突 -->
 
         <!-- Tab 4: 策略回测 -->
         <div class="tab-content" id="tab-backtest">
@@ -762,6 +738,31 @@
             <div id="marketBody"></div>
         </div>
 
+        <!-- Tab: AI 分析中心（H1 场景网格 / H2 空态 / R2 结论台账）-->
+        <div class="tab-content" id="tab-ai">
+            <div class="ai-banner">
+                <div>
+                    <div class="ai-banner-t">🤖 工具出料 · AI 判断 · 你来执行</div>
+                    <div class="ai-banner-d">
+                        每个场景都会把你的<b>真实本地数据</b>整理成一份 AI 看得懂的材料。
+                        工具本身不联网问 AI、不存 API Key、不产生任何费用 —— 复制粘贴这一步始终由你来做。
+                    </div>
+                </div>
+                <span class="ai-banner-asof" id="aiCenterAsOf"></span>
+            </div>
+
+            <div id="aiCenterBody"></div>
+
+            <div class="card" style="margin-top:16px;">
+                <div class="card-title">📚 AI 结论台账
+                    <span style="font-size:11px;color:var(--text-secondary);font-weight:400;margin-left:8px;">
+                        存下来的 AI 回答。三个月后想不起来「当初为什么加仓」时来这里翻。
+                    </span>
+                </div>
+                <div id="aiNotesList"></div>
+            </div>
+        </div>
+
         <!-- Tab 9: 设置 -->
         <div class="tab-content" id="tab-settings">
             <div class="card" style="margin-bottom:16px;">
@@ -901,27 +902,73 @@
         </div>
     </div>
 
-    <!-- AI 持仓解读模态框 -->
-    <div class="modal-overlay" id="aiContextModal" style="display:none;" onclick="closeAIContextModal(event)">
-        <div class="modal" onclick="event.stopPropagation()" style="max-width:720px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
-                <div class="modal-title" style="margin-bottom:0;">AI持仓解读 Prompt</div>
-                <button class="btn" id="copyContextBtn" onclick="copyAIContext()"
-                    style="background:#f1f5f9;color:var(--text);">复制</button>
+    <!-- AI 分析 · 统一提示词弹窗（P1–P5）
+         全站八个场景共用这一个弹窗。三段式：数据清单 / 正文预览 / 动作区。
+         Q4 = A：只复制，不开任何外链，所以这里没有可点的 claude.ai 链接。
+         Q7 = B：默认带真实金额，右上角开关可一键脱敏。 -->
+    <div class="modal-overlay" id="aiPromptModal" style="display:none;">
+        <div class="modal ai-modal" onclick="event.stopPropagation()" style="max-width:820px;">
+            <div class="ai-modal-hd">
+                <div>
+                    <div class="modal-title" id="aiPromptTitle" style="margin-bottom:3px;">让 AI 分析</div>
+                    <div class="ai-modal-meta" id="aiPromptMeta"></div>
+                </div>
+                <button class="btn" id="aiCloseBtn">关闭</button>
             </div>
-            <div id="aiContextLoading" class="loading" style="display:none;">生成中</div>
-            <div class="ai-guide-block">
-                <div class="ai-guide-title">📌 使用步骤</div>
-                <ol class="ai-guide-steps">
-                    <li>点右上角"复制"</li>
-                    <li>打开 <strong><a href="https://claude.ai" target="_blank">Claude.ai</a></strong>（推荐）或 ChatGPT</li>
-                    <li>新建对话，粘贴内容，发送</li>
-                </ol>
-                <div class="ai-guide-model">💡 推荐使用 <strong>Claude Opus 4.6</strong>（指令遵从性更好，不容易忽略"用普通语言"的要求）。若 AI 回答仍有大量专业术语，在回复框追加：<em>"请把刚才的回答改成普通投资者能看懂的语言"</em></div>
-                <div class="ai-guide-disclaimer">⚠️ 此 prompt 由工具根据真实数据生成，AI 回答仅供参考，不构成投资建议。最终决策由您执行。</div>
+
+            <div class="ai-modal-tabs">
+                <button class="ai-modal-tab active" id="aiTabPrompt">① 生成提示词</button>
+                <button class="ai-modal-tab" id="aiTabNote">② 回填 AI 结论</button>
             </div>
-            <textarea id="aiContextText" readonly
-                style="width:100%;height:320px;font-size:13px;font-family:monospace;border:1px solid var(--border);border-radius:8px;padding:12px;resize:vertical;line-height:1.6;"></textarea>
+
+            <!-- 生成态 -->
+            <div id="aiPanePrompt">
+                <!-- P3 数据不足态：不生成半截提示词 -->
+                <div id="aiPromptNotReady" class="ai-notready" style="display:none;"></div>
+
+                <div id="aiPromptMain" style="display:none;">
+                    <div class="ai-dl-bar">
+                        <span id="aiDlSummary">本次带给 AI 的数据</span>
+                        <span class="ai-dl-right">
+                            <label class="ai-redact">
+                                <input type="checkbox" id="aiRedactToggle"> 金额脱敏
+                                <span class="ai-redact-hint" id="aiRedactHint"></span>
+                            </label>
+                            <button class="ai-btn ghost" id="aiToggleList">展开清单 ▾</button>
+                        </span>
+                    </div>
+                    <div id="aiIncluded" style="display:none;"></div>
+
+                    <div class="ai-pre-label">提示词全文（可滚动）</div>
+                    <textarea id="aiPromptText" readonly class="ai-pre-text"></textarea>
+
+                    <div class="ai-modal-ft">
+                        <button class="btn btn-primary" id="aiCopyBtn">📋 复制提示词</button>
+                        <span class="ai-ft-note">
+                            工具不联网问 AI。复制后自己打开 Claude 或 ChatGPT，新建对话粘贴发送。
+                        </span>
+                    </div>
+                    <div class="ai-copy-hint" id="aiCopyHint" style="display:none;">
+                        💡 若 AI 回答里专业术语还是很多，追一句：「请把刚才的回答改成普通投资者能看懂的语言」。<br>
+                        拿到回答后，切到上面的「② 回填 AI 结论」存档，之后能回溯当时是怎么判断的。
+                    </div>
+                    <div class="ai-disclaimer">⚠️ 此提示词由工具根据你的真实数据生成，AI 回答仅供参考，不构成投资建议。最终决策由你执行。</div>
+                </div>
+            </div>
+
+            <!-- 回填态（R1，Q8=C：只存档，不与决策联动）-->
+            <div id="aiPaneNote" style="display:none;">
+                <div class="ai-note-desc">
+                    把 AI 的回答整段粘到这里。工具<b>只存不解析</b>，按「场景 + 日期 + 涉及基金」归档，
+                    之后在「🤖 AI 分析」页和基金详情里能翻到。只写本地数据库，不上传任何地方。
+                </div>
+                <textarea id="aiNoteContent" class="ai-note-text" placeholder="粘贴 AI 的完整回答…"></textarea>
+                <input id="aiNoteSummary" class="ai-note-summary" maxlength="60"
+                       placeholder="一句话小结（可选，台账列表显示这句）：例「医药减到 7%，等 Q3 季报再看」">
+                <div class="ai-modal-ft">
+                    <button class="btn btn-primary" id="aiNoteSave">存档</button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -941,6 +988,11 @@
                 <div style="font-weight:600;font-size:14px;margin:16px 0 10px;padding-bottom:6px;border-bottom:1px solid var(--border);">行业分布</div>
                 <div class="chart-container" id="modalIndustryChart" style="height:200px;"></div>
             </div>
+            <!-- E2：把赛道分析从「决策弹窗 → 同主题对比 → 折叠区」三层深处提到这里，
+                 任何地方点开一只基金都能用；顺带补上呼声最高的「该不该加仓」 -->
+            <div class="ai-fund-actions" id="modalAIActions"></div>
+            <!-- 这只基金相关的历史 AI 结论（R2 关联视图）-->
+            <div id="modalAINotes"></div>
         </div>
     </div>
 
@@ -1089,17 +1141,22 @@
         </div>
     </div>
 
-    <script src="/static/js/terms.js?v=20260729b"></script>
-    <script src="/static/js/tooltip.js?v=20260729b"></script>
-    <script src="/static/js/guide.js?v=20260729b"></script>
-    <script src="/static/js/api.js?v=20260729b"></script>
-    <script src="/static/js/app.js?v=20260729b"></script>
-    <script src="/static/js/watchlist.js?v=20260729b"></script>
-    <script src="/static/js/importer.js?v=20260729b"></script>
-    <script src="/static/js/selector.js?v=20260729b"></script>
-    <script src="/static/js/decisions.js?v=20260729b"></script>
-    <script src="/static/js/simulations.js?v=20260729b"></script>
-    <script src="/static/js/market.js?v=20260729b"></script>
+
+    <!-- 全局 AI 悬浮球（Q3 丙）：任何页面都能唤起，会把当前页最相关的场景排在最前 -->
+    <button id="aiFab" class="ai-fab" title="让 AI 分析这一页的数据">🤖</button>
+
+    <script src="/static/js/terms.js?v=20260730b"></script>
+    <script src="/static/js/tooltip.js?v=20260730b"></script>
+    <script src="/static/js/guide.js?v=20260730b"></script>
+    <script src="/static/js/api.js?v=20260730b"></script>
+    <script src="/static/js/app.js?v=20260730b"></script>
+    <script src="/static/js/watchlist.js?v=20260730b"></script>
+    <script src="/static/js/importer.js?v=20260730b"></script>
+    <script src="/static/js/selector.js?v=20260730b"></script>
+    <script src="/static/js/decisions.js?v=20260730b"></script>
+    <script src="/static/js/simulations.js?v=20260730b"></script>
+    <script src="/static/js/market.js?v=20260730b"></script>
+    <script src="/static/js/ai.js?v=20260730c"></script>
 
 <!-- ── 微信浮动入口 ───────────────────────────────────────────── -->
 <div id="wxWidget">

@@ -3,10 +3,11 @@ package handler
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pakoo/sanhu/internal/aiprompt"
 	"github.com/pakoo/sanhu/internal/selector"
 	"github.com/pakoo/sanhu/internal/watchlist"
 )
@@ -249,24 +250,30 @@ func (h *Handler) GetSelectorSession(c *gin.Context) {
 
 func (h *Handler) ExportSelectorSession(c *gin.Context) {
 	sessionID := c.Param("session_id")
-	row, err := loadSelectorSession(h, sessionID)
-	if err == sql.ErrNoRows {
+	// 先确认这次问卷存在，否则统一场景那边只会返回一句 ready=false，
+	// 而这个端点的调用方（选基页的「导出提示词」按钮）期望的是 404
+	if _, err := loadSelectorSession(h, sessionID); err == sql.ErrNoRows {
 		fail(c, http.StatusNotFound, "not found")
 		return
+	} else if err != nil {
+		fail(c, http.StatusInternalServerError, err.Error())
+		return
 	}
+	// 输出完整提示词，不再是「# Selector Session xxx + 一坨 JSON」。
+	// 原来那份没有任何指令，用户粘进 Claude 只会被反问「你想让我分析什么」。
+	// 装配逻辑统一在 ai_prompts.go 的 selector_gap 场景里，这里只做转发。
+	b := aiprompt.NewBuilder(aiprompt.Options{Redact: c.Query("redact") == "1"})
+	scene, _ := aiprompt.SceneByID("selector_gap")
+	res, err := h.sceneSelector(b, scene, time.Now().Format("2006-01-02 15:04"), sessionID)
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	raw := fmt.Sprintf("{\"answers\":%s,\"gaps\":%s,\"candidates\":%s}",
-		orEmptyJSON(row.AnswersJSON), orEmptyJSON(row.GapsJSON), orEmptyJSON(row.CandidatesJSON))
-
-	md := buildMarkdown(fmt.Sprintf("Selector Session %s", sessionID), []string{
-		"```json",
-		raw,
-		"```",
-	})
-	c.Data(http.StatusOK, "text/markdown; charset=utf-8", []byte(md))
+	if !res.Ready {
+		fail(c, http.StatusBadRequest, res.ReadyNote)
+		return
+	}
+	c.Data(http.StatusOK, "text/markdown; charset=utf-8", []byte(res.Prompt))
 }
 
 func (h *Handler) AdoptRecommendation(c *gin.Context) {
@@ -294,4 +301,48 @@ func orEmptyJSON(s string) string {
 		return "null"
 	}
 	return s
+}
+
+// answerLabels 把问卷答案的内部取值翻译成题干+人话，
+// 直接把 direction=auto 这种发给 AI 它看不懂
+func answerLabels(a selector.UserAnswers) map[string]string {
+	dir := map[string]string{
+		"auto": "让工具按持仓缺口判断", "growth": "科技成长",
+		"dividend": "稳健红利", "balanced": "均衡配置",
+	}
+	risk := map[string]string{"low": "小，尽量别亏", "moderate": "中，能接受一定回撤", "high": "大，愿意换取更高收益"}
+	period := map[string]string{"short": "1 年内", "mid": "1-3 年", "long": "3 年以上"}
+
+	pick := func(m map[string]string, k, dflt string) string {
+		if v, ok := m[k]; ok {
+			return v
+		}
+		if k == "" {
+			return dflt
+		}
+		return k
+	}
+
+	overlap := "不希望与现有持仓重叠"
+	if a.AllowOverlap {
+		overlap = "可以与现有持仓重叠"
+	}
+	return map[string]string{
+		"1 想补的方向":  pick(dir, a.Direction, "未选择"),
+		"2 能接受的波动": pick(risk, a.RiskTolerance, "未选择"),
+		"3 持有期":    pick(period, a.TimePeriod, "未选择"),
+		"4 重叠容忍度":  overlap,
+	}
+}
+
+// sourceLabel 档案来源的人话说明，让 AI 知道这条推荐的依据有多硬
+func sourceLabel(src string) string {
+	switch src {
+	case "pierced":
+		return "季报穿透"
+	case "inferred":
+		return "按名称推断"
+	default:
+		return "未知"
+	}
 }

@@ -23,6 +23,8 @@ func RegisterRoutes(r *gin.Engine, h *Handler) {
 	api.POST("/holdings/refresh", h.RefreshHoldings)
 	api.GET("/holdings/refresh/status", h.GetHoldingsRefreshStatus)
 	api.GET("/holdings/overlap", h.GetHoldingsOverlap)
+	// 持仓穿透的 AI 提示词（新增的第四个入口）
+	api.GET("/holdings/ai-prompt", h.GetLookThroughPrompt)
 	api.GET("/holdings/industry-total", h.GetHoldingsIndustryTotal)
 	api.GET("/holdings/:code/stocks", h.GetFundStocks)
 	api.GET("/holdings/:code/industry", h.GetFundIndustry)
@@ -52,7 +54,15 @@ func RegisterRoutes(r *gin.Engine, h *Handler) {
 	api.POST("/market/valuation/refresh", h.RefreshMarketValuation)
 	api.POST("/peer-ranks/refresh", h.RefreshPeerRanks)
 
+	// AI 分析：统一入口 + 场景清单 + 结论台账。
+	// /ai/context 是旧的「AI持仓解读」端点，内部转发到 portfolio_checkup 场景，
+	// 保留是为了不打断已发布的前端和用户书签。
+	api.GET("/ai/scenes", h.GetAIScenes)
+	api.GET("/ai/prompts/:scene", h.GetAIPrompt)
 	api.GET("/ai/context", h.GetAIContext)
+	api.GET("/ai/notes", h.ListAINotes)
+	api.POST("/ai/notes", h.CreateAINote)
+	api.DELETE("/ai/notes/:id", h.DeleteAINote)
 
 	api.POST("/import/parse", h.ImportParse)
 	api.POST("/import/commit", h.ImportCommit)

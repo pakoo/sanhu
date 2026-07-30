@@ -4,8 +4,20 @@
     {
       "name": "sanhu",
       "runtimeExecutable": "go",
-      "runtimeArgs": ["run", "./cmd/sanhu"],
+      "runtimeArgs": [
+        "run",
+        "./cmd/sanhu"
+      ],
       "port": 8000
+    },
+    {
+      "name": "sanhu-dev",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "SANHU_PORT=8123 go run ./cmd/sanhu"
+      ],
+      "port": 8123
     }
   ]
 }

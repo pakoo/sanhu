@@ -151,6 +151,7 @@
             const json = await res.json();
             if (json.status !== 'ok') throw new Error(json.msg);
             selectorSessionId = json.data.session_id;
+            window.selectorSessionIdForAI = selectorSessionId;
             renderResult(json.data);
             document.getElementById('selectorResult').style.display = 'block';
             document.getElementById('selectorResult').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -301,42 +302,9 @@
     };
 
     // ── export Claude prompt ──────────────────────────────────────────────────
-    window.selectorExportPrompt = async function () {
-        if (!selectorSessionId) { selectorShowToast('请先生成推荐'); return; }
-        const btn = document.getElementById('selectorExportBtn');
-        btn.textContent = '复制中...';
-        try {
-            const res = await fetch(`/api/selector/export/${selectorSessionId}`);
-            if (!res.ok) throw new Error('导出失败');
-            const text = await res.text();
-            await navigator.clipboard.writeText(text);
-            btn.textContent = '✓ 已复制';
-            selectorShowToast('提示词已复制到剪贴板，粘贴到 Claude 即可开始对话 🎉', 4000);
-            setTimeout(() => { btn.textContent = '📋 导出 Claude 提示词'; }, 3000);
-        } catch (e) {
-            btn.textContent = '📋 导出 Claude 提示词';
-            selectorShowToast(`导出失败: ${e.message}`, 3000);
-        }
-    };
-
-    // ── export JSON backup ────────────────────────────────────────────────────
-    window.selectorExportJSON = async function () {
-        if (!selectorSessionId) { selectorShowToast('请先生成推荐'); return; }
-        try {
-            const res = await fetch(`/api/selector/session/${selectorSessionId}`);
-            const json = await res.json();
-            const blob = new Blob([JSON.stringify(json.data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `selector_${selectorSessionId.slice(0, 8)}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-            selectorShowToast('JSON 已下载');
-        } catch (e) {
-            selectorShowToast(`下载失败: ${e.message}`, 3000);
-        }
-    };
+    // 导出改走统一的 AI 弹窗（aiprompt.js openSelectorPrompt）。
+    // 原来这里有两个按钮：「导出 Claude 提示词」和「导出 JSON」，
+    // 内容几乎一样且都是原始 JSON —— 按产品稿 Q2 合并为一份完整提示词。
 
     // ── toast helper ─────────────────────────────────────────────────────────
     function selectorShowToast(msg, duration = 2500) {

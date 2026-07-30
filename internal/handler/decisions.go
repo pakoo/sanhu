@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"fmt"
 	"net/http"
-	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pakoo/sanhu/internal/aiprompt"
 	"github.com/pakoo/sanhu/internal/decisions"
 )
 
@@ -76,30 +76,20 @@ func (h *Handler) LinkTransaction(c *gin.Context) {
 }
 
 func (h *Handler) ExportDecision(c *gin.Context) {
-	id, err := parseInt64Param(c.Param("id"))
-	if err != nil {
-		fail(c, http.StatusBadRequest, err.Error())
-		return
-	}
-
-	decision, err := decisions.GetDecision(h.DB, id)
+	// 原来这里吐的是九行 `- code: 012345` 式的键值列表，且前端根本没有按钮调它。
+	// 现在转发到 decision_review 场景，输出一份能直接粘给 AI 的复盘提示词。
+	b := aiprompt.NewBuilder(aiprompt.Options{Redact: c.Query("redact") == "1"})
+	scene, _ := aiprompt.SceneByID("decision_review")
+	res, err := h.sceneDecision(b, scene, time.Now().Format("2006-01-02 15:04"), c.Param("id"))
 	if err != nil {
 		fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-
-	md := buildMarkdown(fmt.Sprintf("Decision %d", decision.ID), []string{
-		fmt.Sprintf("- code: %s", decision.Code),
-		fmt.Sprintf("- decision_type: %s", decision.DecisionType),
-		fmt.Sprintf("- status: %s", decision.Status),
-		fmt.Sprintf("- created_at: %s", decision.CreatedAt),
-		fmt.Sprintf("- notes: %s", strings.TrimSpace(decision.Notes.String)),
-		fmt.Sprintf("- is_virtual: %d", decision.IsVirtual),
-		fmt.Sprintf("- virtual_entry_nav: %v", decision.VirtualEntryNav),
-		fmt.Sprintf("- target_tp_pct: %v", decision.TargetTPPct),
-		fmt.Sprintf("- target_sl_pct: %v", decision.TargetSLPct),
-	})
-	c.Data(http.StatusOK, "text/markdown; charset=utf-8", []byte(md))
+	if !res.Ready {
+		fail(c, http.StatusBadRequest, res.ReadyNote)
+		return
+	}
+	c.Data(http.StatusOK, "text/markdown; charset=utf-8", []byte(res.Prompt))
 }
 
 func (h *Handler) CancelDecision(c *gin.Context) {
