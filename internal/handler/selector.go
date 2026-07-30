@@ -118,7 +118,78 @@ func (h *Handler) Recommend(c *gin.Context) {
 		fail(c, http.StatusInternalServerError, err.Error())
 		return
 	}
-	ok(c, result)
+
+	// 这里必须按前端契约整形，不能把内部结构体直接抛出去。
+	// 之前直接 ok(c, result)，页面上「系统诊断的配置缺口」三张卡全是 undefined：
+	//   前端读 g.name / g.suggest_add_pct，内部字段却叫 theme / deficit_pct；
+	//   候选卡读 c.composite（0~1）与 data.candidates，内部是 score（0~100）与 top_candidates
+	//   —— 即使有候选也永远渲染不出来。
+	// 与 /api/selector/diagnose 的输出保持一致，两处不再各说一套。
+	gaps := make([]gin.H, 0, len(result.Gaps))
+	for _, g := range result.Gaps {
+		gaps = append(gaps, gin.H{
+			"name":            g.Theme,
+			"category":        g.Category,
+			"current_pct":     g.CurrentPct,
+			"suggest_add_pct": g.DeficitPct,
+			// priority 内部是 1~5 的档位，前端 priorityColor 按 0~1 判色，
+			// 直接传会让所有卡片都判成最高优先级（全红）
+			"priority":       float64(g.Priority) / 5.0,
+			"priority_level": g.Priority,
+		})
+	}
+
+	candidates := make([]gin.H, 0, len(result.TopCandidates))
+	for _, cd := range result.TopCandidates {
+		candidates = append(candidates, gin.H{
+			"code": cd.Code,
+			"name": cd.Name,
+			// composite 前端要 0~1（渲染时 ×100 显示成分数）
+			"composite":        cd.Score / 100.0,
+			"score":            cd.Score,
+			"gap_fit_score":    cd.GapFitScore,
+			"quality_score":    cd.QualityScore,
+			"peer_rank_score":  cd.PeerRankScore,
+			"reason_fragments": candidateReasons(cd),
+			"profile_source":   h.profileSource(cd.Code),
+			// 重叠率暂未计算，给 null 让前端显示「重叠率 N/A」而不是 0%
+			"overlap_rate": nil,
+		})
+	}
+
+	ok(c, gin.H{
+		"session_id": result.SessionID,
+		"gaps":       gaps,
+		"candidates": candidates,
+	})
+}
+
+// candidateReasons 把三项打分翻译成人话，作为候选卡上的推荐理由
+func candidateReasons(c selector.ScoredCandidate) []string {
+	var out []string
+	if c.GapFitScore >= 75 {
+		out = append(out, "行业契合缺口")
+	}
+	if c.QualityScore >= 70 {
+		out = append(out, "综合评分较高")
+	}
+	if c.PeerRankScore >= 70 {
+		out = append(out, "同类排名靠前")
+	}
+	if len(out) == 0 {
+		out = append(out, "综合评分一般，仅作参考")
+	}
+	return out
+}
+
+// profileSource 取该基金档案的来源：pierced=季报穿透，inferred=按名称推断。
+// 前端据此显示不同徽章，让用户知道这条推荐的依据有多硬。
+func (h *Handler) profileSource(code string) string {
+	var src string
+	if err := h.DB.Get(&src, `SELECT COALESCE(profile_source,'') FROM fund_profile WHERE code=?`, code); err != nil {
+		return ""
+	}
+	return src
 }
 
 // selectorSession 对应 selector_cache 的真实列（见 migrations/001_init.sql）

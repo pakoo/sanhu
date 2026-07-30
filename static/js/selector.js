@@ -123,6 +123,13 @@
             `<div class="label" style="margin-bottom:8px;">Top 缺口</div>${html}`;
     }
 
+    // priority 是 0~1 的归一化档位，不是百分比 —— 之前直接 ×100 显示成「优先级 300%」
+    function priorityLabel(p) {
+        if (p >= 0.8) return '高';
+        if (p >= 0.5) return '中';
+        return '低';
+    }
+
     function priorityColor(p) {
         if (p >= 0.8) return 'var(--danger)';
         if (p >= 0.5) return 'var(--warning)';
@@ -176,7 +183,7 @@
                         ${g.suggest_add_pct > 0 ? ` → 建议 ${g.suggest_add_pct.toFixed(0)}%` : ''}
                     </div>
                     <div style="font-size:11px;color:var(--text-secondary);margin-top:2px;">
-                        优先级 ${(g.priority * 100).toFixed(0)}%
+                        优先级 ${priorityLabel(g.priority)}
                     </div>
                 </div>
             `).join('');
