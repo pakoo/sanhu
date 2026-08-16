@@ -2,6 +2,11 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "sanhu-attach",
+      "url": "http://localhost:8000",
+      "port": 8000
+    },
+    {
       "name": "sanhu",
       "runtimeExecutable": "go",
       "runtimeArgs": [

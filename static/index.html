@@ -88,6 +88,7 @@
         <div class="container" style="display:flex;gap:0;">
             <button class="tab-btn active" onclick="switchTab('dashboard')">总览</button>
             <button class="tab-btn" onclick="switchTab('market')">市场</button>
+            <button class="tab-btn" onclick="switchTab('fundflow')">资金流</button>
             <button class="tab-btn" onclick="switchTab('risk')">风险分析</button>
             <button class="tab-btn" onclick="switchTab('rebalance')">调仓建议</button>
             <button class="tab-btn" onclick="switchTab('backtest')">策略回测</button>
@@ -738,6 +739,16 @@
             <div id="marketBody"></div>
         </div>
 
+        <!-- Tab: 板块资金流（docs/product-specs/sector-fund-flow.html）-->
+        <div class="tab-content" id="tab-fundflow">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:10px;">
+                <div style="font-size:13px;color:var(--text-secondary);">
+                    A 股板块的主力资金流向。数据来自东方财富公开接口，是<b>统计推断指标</b>而非真实资金进出，仅供参考，不构成投资建议。
+                </div>
+            </div>
+            <div id="ffBody"></div>
+        </div>
+
         <!-- Tab: AI 分析中心（H1 场景网格 / H2 空态 / R2 结论台账）-->
         <div class="tab-content" id="tab-ai">
             <div class="ai-banner">
@@ -853,6 +864,18 @@
     </div>
 
     <!-- 交易记录模态框 -->
+    <!-- 板块资金流下钻：分时 + 历史 -->
+    <div class="modal-overlay" id="ffDetailModal" style="display:none;align-items:center;justify-content:center;"
+         onclick="ffCloseDetail(event)">
+        <div class="modal" onclick="event.stopPropagation()" style="max-width:760px;width:94%;">
+            <div class="modal-title" id="ffDetailTitle">板块资金流</div>
+            <div id="ffDetailBody"></div>
+            <div style="text-align:right;margin-top:14px;">
+                <button class="btn" onclick="ffCloseDetail()">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="txModal" style="display:none;" onclick="closeTxModal(event)">
         <div class="modal" onclick="event.stopPropagation()" style="max-width:480px;">
             <div class="modal-title">记录交易</div>
@@ -1159,6 +1182,7 @@
     <script src="/static/js/decisions.js?v=20260730b"></script>
     <script src="/static/js/simulations.js?v=20260730b"></script>
     <script src="/static/js/market.js?v=20260730b"></script>
+    <script src="/static/js/fundflow.js?v=20260816l"></script>
     <script src="/static/js/ai.js?v=20260730c"></script>
 
 <!-- ── 微信浮动入口 ───────────────────────────────────────────── -->

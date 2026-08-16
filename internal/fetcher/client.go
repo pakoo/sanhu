@@ -34,7 +34,9 @@ func getWithReferer(url, referer string) ([]byte, error) {
 	var lastErr error
 	for i := 0; i < 3; i++ {
 		if i > 0 {
-			time.Sleep(time.Second)
+			// 指数退避（1s、2s）而不是固定 1 秒：失败最常见的原因是被限流，
+			// 而限流场景下等距重试只会加重限流（见 holdings_fetcher.go:109 的记录）。
+			time.Sleep(time.Duration(1<<(i-1)) * time.Second)
 		}
 		b, err := doGetWithReferer(url, referer)
 		if err == nil {
@@ -43,6 +45,14 @@ func getWithReferer(url, referer string) ([]byte, error) {
 		lastErr = err
 	}
 	return nil, lastErr
+}
+
+// getNoRetry 只打一次，失败立刻返回。
+//
+// 给限流敏感的端点用（板块资金流的 clist/get 是重灾区）。这类接口宁可这次没数据、
+// 让上层降级到缓存，也不要多打一次把封锁期拉长 —— 反正下一个调度周期还会再来。
+func getNoRetry(url, referer string) ([]byte, error) {
+	return doGetWithReferer(url, referer)
 }
 
 func doGet(url string) ([]byte, error) {
