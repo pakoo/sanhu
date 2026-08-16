@@ -125,6 +125,7 @@ function switchTab(tab) {
     if (tab === 'simulations' && typeof simInit === 'function') simInit();
     if (tab === 'settings') loadSettings();
     if (tab === 'market') loadMarket(false);
+    if (tab === 'fundflow' && typeof loadFundFlow === 'function') loadFundFlow(false);
     if (tab === 'ai' && typeof aiLoadCenter === 'function') aiLoadCenter();
     // 模块使用说明区
     if (typeof initModuleGuide === 'function') initModuleGuide(tab);

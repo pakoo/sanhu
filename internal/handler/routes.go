@@ -50,6 +50,13 @@ func RegisterRoutes(r *gin.Engine, h *Handler) {
 	api.POST("/market/ai-watchlist", h.SaveAIWatchlist)
 	api.GET("/market/quote-lookup", h.LookupQuote)
 
+	// 板块资金流（产品稿 docs/product-specs/sector-fund-flow.html）
+	// 限流时不报错，返回降级数据 + stale 标记，前端据此显示「数据截至 X」
+	api.GET("/fundflow/rank", h.GetSectorFlowRank)
+	api.GET("/fundflow/minute", h.GetSectorFlowMinute)
+	api.GET("/fundflow/daily", h.GetSectorFlowDaily)
+	api.GET("/fundflow/replay", h.GetSectorFlowReplay)
+
 	api.GET("/market/valuation", h.GetMarketValuation)
 	api.POST("/market/valuation/refresh", h.RefreshMarketValuation)
 	api.POST("/peer-ranks/refresh", h.RefreshPeerRanks)
