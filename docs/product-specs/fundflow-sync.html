@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>资金流数据中心化分发 — 产品稿</title>
+<style>
+:root{
+  /* 主色按功能调；决策卡的琥珀/绿是**语义色，不要改** */
+  --bg:#eef2f6; --panel:#fff;
+  --ink:#22303f; --ink-2:#54687c; --muted:#93a3b3; --line:#e4edf4;
+  --primary:#7cb4de; --primary-deep:#4b89bb; --primary-soft:#eef7ff;
+  --danger:#e2685f;
+  --shadow:0 8px 20px rgba(63,96,127,.10);
+  --shadow-sm:0 3px 10px rgba(63,96,127,.07);
+  --dq-open:#e9a23b; --dq-open-bg:#fffaf0;
+  --dq-done:#52a67c; --dq-done-bg:#f2faf6;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+.doc{max-width:1560px;margin:0 auto;padding:0 26px 90px}
+h1{font-size:25px;font-weight:800;margin:0 0 6px}
+h2.sec{font-size:19px;font-weight:800;margin:38px 0 14px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;scroll-margin-top:76px}
+h2.sec::before{content:"";width:5px;height:19px;border-radius:3px;background:var(--primary-deep)}
+.doc-head{padding:30px 0 6px}
+.doc-head .sub{font-size:13px;color:var(--ink-2);line-height:1.9}
+.pill{display:inline-block;font-size:11.5px;font-weight:800;border-radius:20px;padding:3px 11px;margin-right:7px}
+.pill.draft{background:#fff4e2;color:#a8720f}
+.pill.base{background:var(--primary-soft);color:var(--primary-deep)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 19px;box-shadow:var(--shadow-sm);font-size:13.5px;line-height:1.85;color:var(--ink-2)}
+table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:10px 0}
+th{background:#f7fafc;text-align:left;padding:9px 12px;font-weight:700;color:var(--ink-2);border-bottom:1px solid var(--line)}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+code{background:#f1f4f7;border-radius:5px;padding:1px 5px;font-size:12px;font-family:"SF Mono",Menlo,monospace;color:#b8446a}
+.scrollx{overflow-x:auto}
+
+/* ---- 手机框（基准 390px）---- */
+.row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+.pcol{flex:0 0 340px;max-width:100%}
+.cap{font-size:13px;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.cap .no{background:var(--primary-deep);color:#fff;border-radius:7px;padding:2px 8px;font-size:11px;font-weight:800}
+.capsub{font-size:11.5px;color:var(--muted);margin:-3px 0 9px;line-height:1.6}
+.phone{width:340px;height:700px;border-radius:32px;overflow:hidden;position:relative;background:#fff;box-shadow:var(--shadow);border:1px solid var(--line)}
+.phone .nav{height:46px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:800;border-bottom:1px solid var(--line)}
+.phone .scr{padding:12px;height:calc(100% - 46px);overflow:hidden}
+
+/* ============ 内联决策卡（勿删；细则见 SPEC_GUIDE § 五·B）============ */
+.dqbar{position:sticky;top:0;z-index:200;margin:0 -26px 18px;padding:11px 26px;
+  background:rgba(238,242,246,.94);backdrop-filter:blur(10px);border-bottom:1px solid #d7e3ec;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.dqbar .p-txt{font-size:13px;font-weight:800;white-space:nowrap}
+.dqbar .p-txt em{font-style:normal;color:var(--dq-open)}
+.dqbar .p-txt.all-done em{color:var(--dq-done)}
+.dqbar .p-track{flex:1;min-width:120px;height:8px;border-radius:5px;background:#d3e0ea;overflow:hidden}
+.dqbar .p-fill{height:100%;width:0;border-radius:5px;background:linear-gradient(90deg,#8ecfae,var(--dq-done));transition:width .25s}
+.dqbar button{font-size:12.5px;font-weight:700;padding:7px 15px;border-radius:19px;cursor:pointer;
+  border:1px solid #c6d6e2;background:#fff;color:var(--ink-2);white-space:nowrap}
+.dqbar button:hover{border-color:var(--primary);color:var(--primary-deep)}
+.dqbar button.primary{background:var(--primary-deep);border-color:var(--primary-deep);color:#fff}
+.dqbar button.ghost-danger:hover{border-color:var(--danger);color:var(--danger)}
+
+.dqrail{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:190;
+  display:flex;flex-direction:column;gap:8px;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);
+  border:1px solid #dce7ef;border-radius:22px;padding:10px 8px;box-shadow:var(--shadow-sm)}
+.dqrail .rdot{width:26px;height:26px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:10.5px;font-weight:800;background:var(--dq-open-bg);color:var(--dq-open);border:1.5px solid var(--dq-open);transition:.15s}
+.dqrail .rdot:hover{transform:scale(1.12)}
+.dqrail .rdot.done{background:var(--dq-done-bg);color:var(--dq-done);border-color:var(--dq-done)}
+@media(max-width:1180px){.dqrail{display:none}}
+
+.dq{margin:16px 0 6px;border-radius:14px;border:1px solid #f0dcb8;border-left:6px solid var(--dq-open);
+  background:var(--dq-open-bg);padding:15px 18px 16px;scroll-margin-top:78px;box-shadow:var(--shadow-sm)}
+.dq.answered{border-color:#cbe8da;border-left-color:var(--dq-done);background:var(--dq-done-bg)}
+.dq-hd{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:4px}
+.dq-id{background:var(--dq-open);color:#fff;font-size:11.5px;font-weight:800;border-radius:7px;padding:2px 9px}
+.dq.answered .dq-id{background:var(--dq-done)}
+.dq-state{font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;background:#fff;color:var(--dq-open);border:1px solid #f0dcb8}
+.dq.answered .dq-state{color:var(--dq-done);border-color:#cbe8da}
+.dq:not(.answered) .dq-state{animation:dqPulse 2.2s ease-in-out infinite}
+@keyframes dqPulse{0%,100%{opacity:1}50%{opacity:.45}}
+.dq-q{font-size:14.5px;font-weight:800;line-height:1.6}
+.dq-sub{font-size:12.5px;color:var(--ink-2);line-height:1.8;margin-top:5px}
+.dq-sub code{background:#fff;border:1px solid #e6d9c0}
+.dq-opts{margin-top:11px;display:flex;flex-direction:column;gap:8px}
+.dq-opt{display:flex;align-items:flex-start;gap:10px;cursor:pointer;background:#fff;
+  border:1.5px solid #e8dcc4;border-radius:11px;padding:11px 13px;transition:.15s}
+.dq-opt:hover{border-color:var(--dq-open);box-shadow:0 2px 8px rgba(233,162,59,.13)}
+.dq-opt input{width:17px;height:17px;margin-top:2px;flex:none;accent-color:var(--dq-done);cursor:pointer}
+.dq-opt.sel{border-color:var(--dq-done);background:var(--dq-done-bg)}
+.dq-opt .o-body{flex:1;min-width:0}
+.dq-opt .o-t{font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.dq-opt .o-d{font-size:12px;color:var(--ink-2);line-height:1.75;margin-top:3px}
+.rec-chip{background:var(--primary-soft);color:var(--primary-deep);border:1px solid #cfe6f7;border-radius:5px;font-size:10.5px;font-weight:800;padding:1px 7px;white-space:nowrap}
+.cost-chip{background:#f4f7fa;color:#6c8092;border:1px solid #dde7ef;border-radius:5px;font-size:10.5px;font-weight:700;padding:1px 7px;white-space:nowrap}
+.dq-note{margin-top:10px}
+.dq-note label{display:block;font-size:11.5px;color:var(--muted);font-weight:700;margin-bottom:5px}
+.dq-note textarea{width:100%;min-height:52px;resize:vertical;border:1.5px solid #e8dcc4;border-radius:10px;
+  padding:9px 11px;font-size:13px;font-family:inherit;line-height:1.7;background:#fff}
+.dq-note textarea:focus{outline:none;border-color:var(--dq-open)}
+
+.sec-badge{display:inline-flex;align-items:center;gap:5px;background:var(--dq-open-bg);color:#a8720f;
+  border:1px solid #f0dcb8;border-radius:20px;font-size:11.5px;font-weight:800;padding:3px 11px}
+.sec-badge.done{background:var(--dq-done-bg);color:#2f7d58;border-color:#cbe8da}
+.sec-badge i{width:7px;height:7px;border-radius:50%;background:var(--dq-open);font-style:normal}
+.sec-badge.done i{background:var(--dq-done)}
+
+.dqsum-row{display:flex;align-items:flex-start;gap:12px;padding:11px 13px;border-radius:11px;background:#fff;
+  border:1px solid var(--line);border-left:4px solid var(--dq-open);margin-bottom:9px;cursor:pointer}
+.dqsum-row.done{border-left-color:var(--dq-done)}
+.dqsum-row .s-id{font-size:12px;font-weight:800;color:var(--ink);flex:none;width:34px}
+.dqsum-row .s-q{flex:1;min-width:0;font-size:12.5px;color:var(--ink-2);line-height:1.7}
+.dqsum-row .s-a{flex:none;max-width:46%;font-size:12.5px;font-weight:800;color:var(--dq-done);text-align:right;line-height:1.7}
+.dqsum-row:not(.done) .s-a{color:var(--dq-open)}
+.dqsum-row .s-a .s-note{display:block;font-weight:600;color:var(--ink-2);font-size:11.5px;margin-top:3px}
+.dq-out{width:100%;min-height:130px;resize:vertical;margin-top:12px;border:1.5px solid var(--line);border-radius:12px;
+  padding:12px 14px;font-family:"SF Mono",Menlo,monospace;font-size:12.5px;line-height:1.85;background:#fbfdff}
+.dq-out:focus{outline:none;border-color:var(--primary)}
+.copy-hint{font-size:12px;color:var(--muted);margin-top:9px;line-height:1.8}
+.toast{position:fixed;left:50%;bottom:38px;transform:translateX(-50%) translateY(14px);background:rgba(34,48,63,.94);
+  color:#fff;font-size:13px;font-weight:700;padding:11px 22px;border-radius:24px;z-index:400;opacity:0;pointer-events:none;transition:.22s}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+<style>
+.verdict{display:flex;gap:16px;align-items:flex-start;background:linear-gradient(135deg,#f2faf6,#eef7ff);
+  border:1px solid #cbe8da;border-left:6px solid var(--dq-done);border-radius:16px;padding:20px 24px;margin:14px 0 6px;box-shadow:var(--shadow-sm)}
+.verdict .vi{font-size:34px;line-height:1;flex:none}
+.verdict h3{margin:0 0 6px;font-size:18px;font-weight:800;color:var(--ink)}
+.verdict p{margin:0 0 8px;font-size:13.5px;line-height:1.9;color:var(--ink-2)}
+.verdict p:last-child{margin-bottom:0}
+.red{background:#fef5f4;border:1px solid #f3d4d1;border-left:6px solid var(--danger);border-radius:14px;padding:15px 19px;margin:12px 0}
+.red .rt{font-size:14px;font-weight:800;color:#b4453c;display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.red .rt .tag{background:var(--danger);color:#fff;border-radius:6px;font-size:11px;padding:2px 8px}
+.red p{margin:5px 0;font-size:13px;line-height:1.85;color:var(--ink-2)}
+.amber{background:#fffaf0;border:1px solid #f0dcb8;border-left:6px solid var(--dq-open);border-radius:14px;padding:15px 19px;margin:12px 0}
+.amber .rt{font-size:14px;font-weight:800;color:#a8720f;display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.amber .rt .tag{background:var(--dq-open);color:#fff;border-radius:6px;font-size:11px;padding:2px 8px}
+.amber p{margin:5px 0;font-size:13px;line-height:1.85;color:var(--ink-2)}
+.ok{color:#2f7d58;font-weight:800} .no{color:#b4453c;font-weight:800} .warn{color:#a8720f;font-weight:800}
+pre.log{background:#1e2a36;color:#c8d6e2;border-radius:11px;padding:14px 17px;font-family:"SF Mono",Menlo,monospace;
+  font-size:11.5px;line-height:1.8;overflow-x:auto;margin:10px 0}
+pre.log b{color:#ffb454;font-weight:700} pre.log i{color:#7fd1a8;font-style:normal} pre.log u{color:#ff8b8b;text-decoration:none}
+.kpis{display:flex;gap:13px;flex-wrap:wrap;margin:12px 0}
+.kpi{flex:1;min-width:150px;background:#fff;border:1px solid var(--line);border-radius:13px;padding:13px 16px;box-shadow:var(--shadow-sm)}
+.kpi .k{font-size:11px;color:var(--muted);font-weight:700;line-height:1.5}
+.kpi .v{font-size:21px;font-weight:800;color:var(--ink);margin:4px 0 1px;letter-spacing:-.5px}
+.kpi .n{font-size:11px;color:var(--ink-2);line-height:1.6}
+.flow{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow-sm);overflow-x:auto}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(390px,1fr));gap:18px;margin:12px 0}
+.vcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px 17px;box-shadow:var(--shadow-sm)}
+.vcard .vh{font-size:13.5px;font-weight:800;color:var(--ink);display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.vcard .vh .no{background:var(--primary-deep);color:#fff;border-radius:7px;padding:2px 8px;font-size:11px}
+.vcard .vs{font-size:11.5px;color:var(--muted);line-height:1.7;margin-bottom:9px}
+.vcard ul{margin:9px 0 0;padding-left:17px;font-size:12px;color:var(--ink-2);line-height:1.85}
+.note{font-size:12px;color:var(--muted);line-height:1.85;margin:8px 0}
+h3.sub{font-size:15px;font-weight:800;margin:22px 0 8px;color:var(--ink)}
+td .ok,td .no,td .warn{white-space:nowrap}
+</style>
+</head>
+
+<body>
+<div class="doc">
+
+  <div class="dqbar">
+    <span class="p-txt" id="pTxt">0 / 0 已决策</span>
+    <div class="p-track"><div class="p-fill" id="pFill"></div></div>
+    <button id="btnNext">跳到下一个待决策 ↓</button>
+    <button class="primary" id="btnCopyTop">复制答案给 Claude</button>
+    <button class="ghost-danger" id="btnReset">清空</button>
+  </div>
+  <div class="dqrail" id="dqRail"></div>
+
+  <div class="doc-head">
+    <h1>资金流数据中心化分发 — 产品稿</h1>
+    <div class="sub">
+      <span class="pill draft">待确认</span><span class="pill base">sanhu · 2026-08-16</span><br>
+      承接已上线的「资金流」功能（<a href="sector-fund-flow.html">可行性分析</a> ·
+      <a href="fundflow-replay.html">自动刷新与回放</a>）。
+      目标：<b>让每个用户不再各自去打东财</b>，改为从统一的数据源同步。
+    </div>
+  </div>
+
+  <!-- ═══ 一、结论 ═══ -->
+  <section>
+    <h2 class="sec">一、结论先行</h2>
+    <div class="verdict">
+      <div class="vi">✅</div>
+      <div>
+        <h3>方向完全对，但<b>大概率不需要跑一台服务器</b> —— 静态文件就够了。</h3>
+        <p><b>问题是真的：</b>现在每个用户的 sanhu 都各自去打东财，日均约 13 次。
+        用户数上去之后，就是 N 个 IP 同时在刷同一份公开数据 —— 既容易触发限流（这个坑我们已经踩过），
+        对东财也不礼貌。集中采集一次、大家来取，是正确的方向。</p>
+        <p><b>但「服务端」不一定意味着服务器。</b>实测一个交易日的完整数据包
+        gzip 只有 <b>79 KB</b>，全年 <b>19 MB</b>。这个量级用<b>静态文件 + CDN</b>分发绰绰有余：
+        没有服务器要运维、没有月租、没有宕机风险，而且<b>项目里已经有两个同类先例</b> ——
+        <code>seed.sql.gz</code>（内嵌初始数据）和 <code>SANHU_SEED_URL</code>（允许从 URL 取种子），
+        以及 updater 查 GitHub Releases。</p>
+        <p><b>真正的难点不在分发，在采集端跑在哪。</b>抓取必须从<b>能连上东财的网络</b>发起 ——
+        而我们已经实测过，境外出口连不上 <code>push2</code>。这一条把「GitHub Actions 定时跑」
+        这个最省事的方案基本排除了（见第四节）。</p>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="k">单日数据包</div><div class="v">79 KB</div><div class="n">gzip 后。未压缩 222 KB</div></div>
+      <div class="kpi"><div class="k">全年累计</div><div class="v">19 MB</div><div class="n">250 个交易日</div></div>
+      <div class="kpi"><div class="k">现在（每用户）</div><div class="v">13 次/天</div><div class="n">N 个用户 = N×13 次打东财</div></div>
+      <div class="kpi"><div class="k">集中采集后</div><div class="v">13 次/天</div><div class="n">总量，与用户数无关</div></div>
+      <div class="kpi"><div class="k">用户侧</div><div class="v">0 次</div><div class="n">不再直连东财（保留降级）</div></div>
+    </div>
+  </section>
+
+  <!-- ═══ 二、为什么值得做 ═══ -->
+  <section>
+    <h2 class="sec">二、账算清楚：集中采集省下多少</h2>
+    <div class="scrollx"><table>
+      <tr><th style="width:16%">用户规模</th><th style="width:22%">现在（各自直连东财）</th><th style="width:22%">集中采集后</th><th>说明</th></tr>
+      <tr><td>1 人</td><td>13 次/天</td><td>13 次/天</td><td>没差别</td></tr>
+      <tr><td>10 人</td><td>130 次/天，来自 10 个 IP</td><td class="ok">13 次/天</td><td>已经接近「200 个请求会被限流」的记录值</td></tr>
+      <tr><td>100 人</td><td class="no">1300 次/天，100 个 IP</td><td class="ok">13 次/天</td><td>每个用户都可能被单独限流，且体验随机</td></tr>
+      <tr><td>1000 人</td><td class="no">13000 次/天</td><td class="ok">13 次/天</td><td>集中采集的量<b>与用户数完全无关</b></td></tr>
+    </table></div>
+    <p class="note">还有一个容易被忽略的收益：<b>历史数据不再依赖用户自己开着程序</b>。
+    现在的设计是「程序当天开过才存得到那天」——东财只提供当日分时，错过就永久没有。
+    集中采集之后，只要采集端在跑，所有用户都能拿到完整的历史，包括他装 sanhu 之前的那些天。</p>
+  </section>
+
+  <!-- ═══ 三、分发方式 + Q1 ═══ -->
+  <section>
+    <h2 class="sec">三、怎么分发</h2>
+    <div class="grid2">
+      <div class="vcard">
+        <div class="vh"><span class="no">甲</span>静态文件 + CDN <span style="font-size:11px;color:#2f7d58">推荐</span></div>
+        <div class="vs">每个交易日生成一个 <code>2026-08-14.json.gz</code>，扔到对象存储 / GitHub Release / Pages。客户端按日期拉缺的那几天。</div>
+        <ul>
+          <li><b>零运维</b>：没有进程要守，没有宕机概念</li>
+          <li><b>成本近似为零</b>：19 MB/年，任何 CDN 的免费额度都够</li>
+          <li><b>天然可缓存</b>：文件不可变，CDN 命中率接近 100%</li>
+          <li><b>已有先例</b>：<code>SANHU_SEED_URL</code> 就是这个模式</li>
+          <li>缺点：只能按天取整包，做不了「只要某个板块」这种细粒度查询</li>
+        </ul>
+      </div>
+      <div class="vcard">
+        <div class="vh"><span class="no">乙</span>真 API 服务器</div>
+        <div class="vs">跑一个后端，客户端按日期范围 / 板块查询。</div>
+        <ul>
+          <li>查询灵活，能做增量、能做筛选</li>
+          <li>缺点：<b>要运维、要花钱、会宕机</b>，而且宕了所有用户一起没数据</li>
+          <li>缺点：要处理限流、滥用、DDoS —— 这些都是新增的运维负担</li>
+          <li>对 79 KB/天这个量级来说，<b>灵活性买不到什么</b></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="dq" id="Q1" data-q="Q1" data-title="分发方式">
+      <div class="dq-hd"><span class="dq-id">Q1</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">用静态文件分发，还是跑一个 API 服务器？</div>
+      <div class="dq-sub">数据量实测 79 KB/天、19 MB/年。这个量级下，服务器能提供的额外能力很有限，但运维成本是实打实的。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q1" value="甲 静态文件 + CDN（按交易日一个 .json.gz）">
+          <span class="o-body"><span class="o-t">甲 静态文件 + CDN<span class="rec-chip">我建议</span><span class="cost-chip">零运维 · 约 1 天</span></span>
+          <span class="o-d">每个交易日一个文件，客户端按日期补齐。<b>没有服务器要守</b>，成本近似为零，且与项目已有的 seed/updater 模式一脉相承。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q1" value="乙 API 服务器">
+          <span class="o-body"><span class="o-t">乙 API 服务器<span class="cost-chip">月租 + 运维 · 约 2.5 天</span></span>
+          <span class="o-d">查询灵活。但对 79 KB/天来说，代价（运维、月租、宕机、防滥用）明显大于收益。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q1" value="先做甲，将来有细粒度需求再补乙">
+          <span class="o-body"><span class="o-t">先甲，需要时再补乙<span class="cost-chip">约 1 天</span></span>
+          <span class="o-d">静态文件先跑起来。哪天真出现「只要某板块近三年」这类需求，再在同一份数据上加 API 也不迟 —— 两者不冲突。</span></span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder="比如：你已经有在用的对象存储 / 域名"></textarea></div>
+    </div>
+  </section>
+
+  <!-- ═══ 四、采集端跑在哪（真难点）═══ -->
+  <section>
+    <h2 class="sec">四、真正的难点：采集端跑在哪</h2>
+
+    <div class="red">
+      <div class="rt"><span class="tag">红线</span>境外机器抓不到东财 —— 这条排除了最省事的方案</div>
+      <p>2026-08-16 实测（详见前一份稿的红线 1）：挂境外节点时，
+      <code>push2</code> / <code>push2his</code> 全线 <b>HTTP 000</b>，而 <code>fund.eastmoney.com</code> 正常。
+      也就是说<b>行情类接口对网络位置敏感</b>。</p>
+      <pre class="log">GitHub Actions runner（ubuntu-latest，境外）
+  → 抓 push2   <u>极可能失败</u>，且失败时你不在现场，只会看到一个空文件
+  → 而分时数据<b>错过当天就永久补不回来</b>，静默失败的代价是永久性的</pre>
+      <p><b>所以采集端必须跑在能稳定连上东财的网络里。</b>你提到自己有服务器 ——
+      之前用它测 <code>push2</code> 返回过 200，那台是合适的落点。</p>
+    </div>
+
+    <div class="scrollx"><table>
+      <tr><th style="width:20%">采集端落点</th><th style="width:13%">能否连东财</th><th style="width:15%">可靠性</th><th>说明</th></tr>
+      <tr><td><b>你的国内服务器</b></td><td class="ok">✅ 已验证</td><td class="ok">高</td>
+          <td>一个 cron + 一条命令。<b>最直接的方案</b></td></tr>
+      <tr><td>GitHub Actions</td><td class="no">❌ 大概率不行</td><td class="no">低</td>
+          <td>免费、零运维，但 runner 在境外。<b>失败还静默</b>，数据永久缺失</td></tr>
+      <tr><td>你自己的电脑</td><td class="ok">✅</td><td class="warn">看你开不开机</td>
+          <td>就是现在的模式。周末/出差就断档</td></tr>
+      <tr><td>国内云函数 / 轻量服务器</td><td class="ok">✅</td><td class="ok">高</td>
+          <td>月租几块到几十块。如果不想用现有服务器，这是备选</td></tr>
+    </table></div>
+
+    <div class="amber">
+      <div class="rt"><span class="tag">必做</span>采集失败要能被你知道</div>
+      <p>分时数据<b>错过当天就永久补不回来</b>，所以「静默失败」是这个功能最危险的失效模式 ——
+      等你三个月后打开回放发现缺了一堆日期，已经晚了。
+      采集脚本必须在失败时发出可见的信号（日志留存 + 失败时推送/邮件/企业微信任选其一），
+      并且<b>当天之内可以手动补跑</b>（这个入口已经写好了，见 <code>TestBackfillMinuteToday</code>）。</p>
+    </div>
+
+    <div class="dq" id="Q2" data-q="Q2" data-title="采集端落点">
+      <div class="dq-hd"><span class="dq-id">Q2</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">每日采集跑在哪台机器上？</div>
+      <div class="dq-sub">这题的约束是硬的：必须能连上东财的行情接口，且每个交易日 19:00 稳定执行。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q2" value="你的国内服务器（cron + 上传）">
+          <span class="o-body"><span class="o-t">你现有的国内服务器<span class="rec-chip">我建议</span><span class="cost-chip">零新增成本</span></span>
+          <span class="o-d">已验证能连东财。加一个 cron，跑采集 + 上传数据文件。<b>不需要新买任何东西</b>。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q2" value="国内云函数/轻量服务器（新开）">
+          <span class="o-body"><span class="o-t">新开国内云函数 / 轻量服务器<span class="cost-chip">月租数元起</span></span>
+          <span class="o-d">和主业务隔离，互不影响。适合不想让现有服务器承担额外职责的情况。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q2" value="GitHub Actions（接受境外抓取失败风险）">
+          <span class="o-body"><span class="o-t">GitHub Actions<span class="cost-chip">免费但高风险</span></span>
+          <span class="o-d">最省事，但 runner 在境外，实测行情接口连不上。<b>我不建议</b> —— 失败是静默的，而分时数据不可补。</span></span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder="比如：服务器所在地区 / 已有的定时任务方案"></textarea></div>
+    </div>
+  </section>
+
+  <!-- ═══ 五、架构 ═══ -->
+  <section>
+    <h2 class="sec">五、整体链路</h2>
+    <div class="flow">
+<pre style="margin:0;font-family:'SF Mono',Menlo,monospace;font-size:12px;line-height:1.95;color:#54687c">
+┌─ 采集端（国内，每交易日 19:00）────────────────────────────────────────┐
+│  复用<b style="color:#2f7d58">现有生产代码</b>：sectorflow.Snapshot + SnapshotMinuteTop        │
+│  ① 抓榜单（行业 + 概念）→ 落本地库                                     │
+│  ② 抓 Top50 分时（串行 1.5 秒间隔，约 75 秒）→ 落本地库                │
+│  ③ 导出当日数据包 <b>2026-08-14.json.gz</b>（实测 79 KB）                 │
+│  ④ 上传到对象存储 / GitHub Release                                     │
+│  ⑤ 更新 <b>index.json</b>（有哪些日期可用 + 各自校验和）                  │
+│     └ 失败 → 告警（分时不可补，静默失败是最危险的失效模式）            │
+└──────────────────────────┬─────────────────────────────────────────────┘
+                           ▼  静态文件，CDN 可缓存
+┌─ 分发（无服务器）──────────────────────────────────────────────────────┐
+│  https://&lt;cdn&gt;/fundflow/index.json                                     │
+│  https://&lt;cdn&gt;/fundflow/2026-08-14.json.gz   ← 不可变，永久缓存         │
+└──────────────────────────┬─────────────────────────────────────────────┘
+                           ▼
+┌─ 客户端 sanhu（用户电脑）──────────────────────────────────────────────┐
+│  <b style="color:#2f7d58">新增</b> internal/sync：                                              │
+│    · 启动时 + 每日一次拉 index.json，比对本地已有日期                  │
+│    · 只下载缺的那几天（首次约 19 MB，之后每天 79 KB）                  │
+│    · 写进同一套表 → <b>前端一行代码都不用改</b>                          │
+│  <b style="color:#b4453c">保留</b> 直连东财的老路径作为降级（见 Q3）                            │
+└────────────────────────────────────────────────────────────────────────┘
+</pre>
+    </div>
+    <p class="note"><b>为什么客户端改动很小：</b>数据最终写进的是<b>同一套表</b>
+    （<code>sector_fund_flow_daily</code> / <code>_minute</code>），
+    所以榜单、热力图、回放这些上层功能<b>完全不需要改</b> —— 它们只认表，不关心数据从哪来。</p>
+  </section>
+
+  <!-- ═══ 六、还要不要直连 + Q3 ═══ -->
+  <section>
+    <h2 class="sec">六、客户端还要不要保留直连东财</h2>
+    <div class="card">
+      <p style="margin-top:0">中心化之后有个新问题：<b>当天的实时数据怎么办？</b>
+      采集端 19:00 才出包，但用户下午 2 点打开程序想看今天的盘中情况 —— 中心源里还没有。</p>
+      <p style="margin-bottom:0">三种处理方式，差别在于「是否允许客户端在特定情况下还去打东财」。</p>
+    </div>
+    <div class="dq" id="Q3" data-q="Q3" data-title="客户端是否保留直连">
+      <div class="dq-hd"><span class="dq-id">Q3</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">客户端还要不要保留直连东财的能力？</div>
+      <div class="dq-sub">直连的代码已经写好且在跑，这题决定的是「留着、留一半、还是关掉」。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q3" value="历史走中心源，当日盘中仍直连（默认开）">
+          <span class="o-body"><span class="o-t">历史走中心源，当日盘中仍直连<span class="rec-chip">我建议</span></span>
+          <span class="o-d">历史和回放全部来自中心源（<b>这部分占请求量的绝大多数</b>）；只有「看今天盘中」时才直连，
+          且受 TTL 保护（5 分钟）。既解决了 N×13 的问题，又不牺牲当日实时性。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q3" value="完全不直连，全部走中心源（当日数据滞后到 19:00）">
+          <span class="o-body"><span class="o-t">完全不直连<span class="cost-chip">对东财最友好</span></span>
+          <span class="o-d">用户侧对东财的请求归零。代价：<b>看不到当天盘中</b>，最新数据永远是昨天的。
+          如果采集端能提高到盘中每 30 分钟出包，这个代价会小很多。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q3" value="中心源为主，中心源不可用时才回退直连">
+          <span class="o-body"><span class="o-t">中心源为主，不可用时回退直连</span>
+          <span class="o-d">最稳。中心源挂了用户也不受影响。代价是「中心源挂掉」这件事会被掩盖，你可能很久发现不了。</span></span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+  </section>
+
+  <!-- ═══ 七、要提醒你的事 ═══ -->
+  <section>
+    <h2 class="sec">七、两件我必须提醒你的事</h2>
+
+    <div class="amber">
+      <div class="rt"><span class="tag">合规</span>「自己用」和「分发给别人」是两回事</div>
+      <p>现在每个用户各自去抓东财的公开接口，性质接近个人使用。
+      改成<b>你集中抓取、再分发给所有用户</b>之后，性质变成了<b>数据再分发</b> ——
+      这在法律和平台条款上是不同的一档，尤其当 sanhu 的用户规模变大、或将来涉及任何收费时。</p>
+      <p>我不是律师，没法给你结论。但这件事值得你在动手前自己确认一下，
+      至少心里有数：<b>技术上没有障碍，风险在别处。</b>
+      降低风险的常见做法：只分发<b>衍生/聚合</b>结果而非原始数据、标注来源、
+      提供关闭开关让用户可以选择自己直连、以及不对数据本身收费。</p>
+    </div>
+
+    <div class="amber">
+      <div class="rt"><span class="tag">隐私</span>别把 sanhu 的卖点弄丢了</div>
+      <p>README 里写着「工具不替你下单，不接入任何 AI 后端，<b>不存储你的账户信息</b>」，
+      而且是本地运行、首启无需联网。加了中心同步之后，务必守住：</p>
+      <p>· 同步是<b>单向拉取</b>，客户端不上传任何东西 —— 不要顺手加「统计用户数」之类的回传<br>
+      · 请求里不带任何用户标识（无 token、无设备 ID、无 UA 指纹）<br>
+      · 同步可以<b>关闭</b>，关掉后退回现在的直连模式，功能不残废<br>
+      · 这几条最好写进 README，否则用户会合理地怀疑「它开始联网了，是不是也在传我的持仓」</p>
+    </div>
+
+    <div class="dq" id="Q4" data-q="Q4" data-title="同步开关与隐私声明">
+      <div class="dq-hd"><span class="dq-id">Q4</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">同步功能默认开还是默认关？</div>
+      <div class="dq-sub">这题关系到用户对「本地工具」这个定位的信任，不只是技术选项。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q4" value="默认开，设置页可关，README 写明只拉不传">
+          <span class="o-body"><span class="o-t">默认开 + 可关 + README 写明<span class="rec-chip">我建议</span></span>
+          <span class="o-d">默认开才能真正解决 N×13 的问题（绝大多数用户不会去改设置）。
+          但必须<b>在设置页给关闭开关</b>，并在 README 明确写「单向拉取、不带任何标识、可关闭」。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q4" value="默认关，首次进资金流页时询问">
+          <span class="o-body"><span class="o-t">默认关，首次使用时问一次<span class="cost-chip">最保守</span></span>
+          <span class="o-d">对隐私最尊重，但多数人会跳过询问 → 实际开启率低 → 问题没解决。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q4" value="默认开且不提供关闭（简化实现）">
+          <span class="o-body"><span class="o-t">默认开且不可关<span class="cost-chip">最省事</span></span>
+          <span class="o-d">实现最简单。但和「本地运行」的定位冲突，<b>我不建议</b> —— 省下的那点工作量不值得。</span></span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+  </section>
+
+  <!-- ═══ 八、工作量 ═══ -->
+  <section>
+    <h2 class="sec">八、工作量</h2>
+    <div class="scrollx"><table>
+      <tr><th style="width:28%">模块</th><th style="width:12%">人日</th><th>说明</th></tr>
+      <tr><td>数据包导出 + index.json</td><td>0.4</td><td>复用现有表结构，导出成 79 KB 的日包（原型已验证过大小）</td></tr>
+      <tr><td>采集端脚本 + cron</td><td>0.3</td><td>复用 Snapshot/SnapshotMinuteTop，加导出与上传、失败告警</td></tr>
+      <tr><td>客户端 internal/sync</td><td>0.6</td><td>拉 index、比对本地、下载缺失日、写库、去重</td></tr>
+      <tr><td>设置页开关 + README</td><td>0.3</td><td>Q4 的隐私声明与关闭入口</td></tr>
+      <tr><td>降级与联调</td><td>0.4</td><td>中心源不可用、文件损坏、日期缺口</td></tr>
+      <tr><td><b>合计</b></td><td><b>约 2 人日</b></td><td>前提是 Q1 选静态文件；选 API 服务器约 +1.5 天，且此后长期有运维</td></tr>
+    </table></div>
+    <p class="note"><b>前端零改动</b> —— 数据写进同一套表，榜单/热力图/回放都不需要动。
+    这是当初把抓取、存储、展示分层的回报。</p>
+    <p class="note"><b>本项目非小程序，不涉及分享设计</b> —— 桌面端 Web，无分享入口需求，故本节不写。</p>
+  </section>
+
+  <!-- ═══ 九、汇总 ═══ -->
+  <section>
+    <h2 class="sec">九、决策汇总与提交</h2>
+    <div class="card">
+      <div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:4px">你的决策汇总</div>
+      <div style="font-size:12.5px;margin-bottom:14px">随上面的作答实时更新。<b>没答完也能复制</b> —— 未决策的会标成「未答」。</div>
+      <div id="sumList"></div>
+      <div style="font-size:13px;font-weight:800;color:var(--ink);margin:18px 0 0">粘给 Claude 的内容</div>
+      <textarea class="dq-out" id="dqOut" readonly></textarea>
+      <div style="display:flex;gap:10px;margin-top:11px;flex-wrap:wrap">
+        <button class="primary" id="btnCopyBottom" style="font-size:13.5px;font-weight:800;padding:10px 22px;border-radius:22px;border:1px solid var(--primary-deep);background:var(--primary-deep);color:#fff;cursor:pointer">复制答案</button>
+        <button id="btnNext2" style="font-size:13px;font-weight:700;padding:10px 18px;border-radius:22px;border:1px solid #c6d6e2;background:#fff;color:var(--ink-2);cursor:pointer">回到第一个未答 ↑</button>
+      </div>
+      <div class="copy-hint">复制后直接粘进聊天框发我即可。答案存在你本地浏览器，关掉页面不会丢。</div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.9">
+      开工 Gate：四道题答完 · 采集端落点已确认能连东财 · 合规那条你已自行确认过 ·
+      隐私声明文案已定（这条影响 README，属于对外承诺）。
+    </div>
+  </section>
+
+  <div class="toast" id="toast">已复制</div>
+</div>
+<!-- ============================================================================
+     决策卡引擎（零配置，勿改）
+     - 自动发现所有 .dq 卡片，题目短标题读 data-title
+     - localStorage 键名按文件名生成，多份稿互不干扰
+     - 加一道题只需复制一个 .dq 块，不用碰这段 JS
+     ============================================================================ -->
+<script>
+(function(){
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.dq'));
+  if (!cards.length) return;
+
+  // 键名 = 目录名 + 文件名。**只用文件名不行**：约定把稿子放成
+  // <feature-dir>/prd.html 之后，所有稿的文件名都叫 prd.html —— 那样它们会共用同一份答案，
+  // 表现是「这份稿里没点过的题，冒出别份稿的旧答案」（2026-08-14 真踩过，且很难看出来）。
+  var segs = location.pathname.split('/').filter(Boolean);
+  var file = (segs.pop() || 'product-spec').replace(/\.html?$/i,'');
+  var dir  = segs.pop() || '';
+  var KEY = 'dq::' + (dir ? dir + '/' : '') + file;
+
+  var titleOf = {};
+  cards.forEach(function(c){
+    titleOf[c.getAttribute('data-q')] = c.getAttribute('data-title') || c.getAttribute('data-q');
+  });
+
+  // 题号顺序（汇总/浮标用）与页面顺序（「下一个」用）是两套，别混
+  var byNum = cards.map(function(c){ return c.getAttribute('data-q'); })
+                   .sort(function(a,b){ return (+a.replace(/\D/g,'')) - (+b.replace(/\D/g,'')); });
+  var byDom = cards.map(function(c){ return c.getAttribute('data-q'); });
+
+  var state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e) { state = {}; }
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){} }
+  function get(id){ return state[id] || { v:'', note:'' }; }
+  function esc(s){ return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+
+  function render(){
+    var done = 0;
+    cards.forEach(function(card){
+      var id = card.getAttribute('data-q'), s = get(id), ok = !!s.v;
+      if (ok) done++;
+      card.classList.toggle('answered', ok);
+      card.querySelector('.dq-state').textContent = ok ? ('已定：' + s.v) : '待你决策';
+      card.querySelectorAll('.dq-opt').forEach(function(opt){
+        var r = opt.querySelector('input');
+        r.checked = (r.value === s.v);
+        opt.classList.toggle('sel', r.checked);
+      });
+      var ta = card.querySelector('.dq-note textarea');
+      if (ta && ta.value !== s.note) ta.value = s.note || '';
+    });
+
+    var pt = document.getElementById('pTxt');
+    pt.innerHTML = '<em>' + done + '</em> / ' + cards.length + ' 已决策';
+    pt.classList.toggle('all-done', done === cards.length);
+    document.getElementById('pFill').style.width = (done / cards.length * 100) + '%';
+
+    var rail = document.getElementById('dqRail');
+    rail.innerHTML = '';
+    byNum.forEach(function(id){
+      var d = document.createElement('div');
+      d.className = 'rdot' + (get(id).v ? ' done' : '');
+      d.textContent = id;
+      d.title = titleOf[id] + (get(id).v ? '：' + get(id).v : '（待决策）');
+      d.onclick = function(){ jumpTo(id); };
+      rail.appendChild(d);
+    });
+
+    document.querySelectorAll('h2.sec').forEach(function(h){
+      var old = h.querySelector('.sec-badge'); if (old) old.remove();
+      var sec = h.closest('section'); if (!sec) return;
+      var inSec = Array.prototype.slice.call(sec.querySelectorAll('.dq'));
+      if (!inSec.length) return;
+      var open = inSec.filter(function(c){ return !get(c.getAttribute('data-q')).v; }).length;
+      var b = document.createElement('span');
+      b.className = 'sec-badge' + (open ? '' : ' done');
+      b.innerHTML = '<i></i>' + (open ? (open + ' 个待你决策') : '本节已决策完');
+      h.appendChild(b);
+    });
+
+    renderSummary(done);
+  }
+
+  function renderSummary(done){
+    var list = document.getElementById('sumList');
+    if (list) {
+      list.innerHTML = '';
+      byNum.forEach(function(id){
+        var s = get(id);
+        var row = document.createElement('div');
+        row.className = 'dqsum-row' + (s.v ? ' done' : '');
+        row.innerHTML = '<div class="s-id">' + id + '</div>' +
+          '<div class="s-q">' + esc(titleOf[id]) + '</div>' +
+          '<div class="s-a">' + (s.v ? esc(s.v) : '未答') +
+          (s.note ? '<span class="s-note">' + esc(s.note) + '</span>' : '') + '</div>';
+        row.onclick = function(){ jumpTo(id); };
+        list.appendChild(row);
+      });
+    }
+    var out = document.getElementById('dqOut');
+    if (!out) return;
+    var title = (document.querySelector('h1') || {}).textContent || slug;
+    var lines = ['【' + title.trim() + ' · 决策回复】'];
+    var missing = [];
+    byNum.forEach(function(id){
+      var s = get(id);
+      if (s.v) lines.push(id + ' = ' + s.v + (s.note ? '（补充：' + s.note + '）' : ''));
+      else missing.push(id);
+    });
+    if (missing.length) lines.push('', '未答：' + missing.join('、'));
+    lines.push('', '（' + done + '/' + cards.length + ' 已决策）');
+    out.value = lines.join('\n');
+  }
+
+  function jumpTo(id){
+    var el = document.getElementById(id); if (!el) return;
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+    el.style.transition = 'box-shadow .25s';
+    el.style.boxShadow = '0 0 0 4px rgba(233,162,59,.32)';
+    setTimeout(function(){ el.style.boxShadow=''; }, 900);
+  }
+
+  function nextOpen(){
+    var open = byDom.filter(function(id){ return !get(id).v; });
+    if (!open.length) { toast('都答完了，点「复制答案」发我'); return; }
+    var y = window.scrollY + 120;
+    var below = open.filter(function(id){ return document.getElementById(id).offsetTop > y; });
+    jumpTo(below.length ? below[0] : open[0]);
+  }
+
+  cards.forEach(function(card){
+    var id = card.getAttribute('data-q');
+    card.querySelectorAll('.dq-opt input').forEach(function(r){
+      r.addEventListener('change', function(){
+        var s = get(id); s.v = r.value; state[id] = s; save(); render();
+      });
+    });
+    var ta = card.querySelector('.dq-note textarea');
+    if (ta) ta.addEventListener('input', function(){
+      var s = get(id); s.note = ta.value.trim(); state[id] = s; save();
+      renderSummary(byNum.filter(function(x){ return !!get(x).v; }).length);
+    });
+  });
+
+  var tId;
+  function toast(msg){
+    var t = document.getElementById('toast'); if (!t) return;
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(tId); tId = setTimeout(function(){ t.classList.remove('show'); }, 1900);
+  }
+
+  function copyOut(){
+    var ta = document.getElementById('dqOut'); if (!ta) return;
+    function fallback(){
+      ta.removeAttribute('readonly'); ta.select();
+      try { document.execCommand('copy'); toast('已复制，粘给我即可'); }
+      catch(e){ toast('复制失败，请手动全选下方文本'); }
+      ta.setAttribute('readonly','readonly');
+      window.getSelection().removeAllRanges();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(ta.value).then(function(){ toast('已复制，粘给我即可'); }, fallback);
+    } else fallback();
+  }
+
+  function bind(id, fn){ var el = document.getElementById(id); if (el) el.onclick = fn; }
+  bind('btnNext', nextOpen); bind('btnNext2', nextOpen);
+  bind('btnCopyTop', copyOut); bind('btnCopyBottom', copyOut);
+  bind('btnReset', function(){
+    if (!confirm('清空所有已作答的决策？')) return;
+    state = {}; save(); render(); toast('已清空');
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>A 股板块资金流向图表 — 可行性分析</title>
+<style>
+:root{
+  /* 主色按功能调；决策卡的琥珀/绿是**语义色，不要改** */
+  --bg:#eef2f6; --panel:#fff;
+  --ink:#22303f; --ink-2:#54687c; --muted:#93a3b3; --line:#e4edf4;
+  --primary:#7cb4de; --primary-deep:#4b89bb; --primary-soft:#eef7ff;
+  --danger:#e2685f;
+  --shadow:0 8px 20px rgba(63,96,127,.10);
+  --shadow-sm:0 3px 10px rgba(63,96,127,.07);
+  --dq-open:#e9a23b; --dq-open-bg:#fffaf0;
+  --dq-done:#52a67c; --dq-done-bg:#f2faf6;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+.doc{max-width:1560px;margin:0 auto;padding:0 26px 90px}
+h1{font-size:25px;font-weight:800;margin:0 0 6px}
+h2.sec{font-size:19px;font-weight:800;margin:38px 0 14px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;scroll-margin-top:76px}
+h2.sec::before{content:"";width:5px;height:19px;border-radius:3px;background:var(--primary-deep)}
+.doc-head{padding:30px 0 6px}
+.doc-head .sub{font-size:13px;color:var(--ink-2);line-height:1.9}
+.pill{display:inline-block;font-size:11.5px;font-weight:800;border-radius:20px;padding:3px 11px;margin-right:7px}
+.pill.draft{background:#fff4e2;color:#a8720f}
+.pill.base{background:var(--primary-soft);color:var(--primary-deep)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 19px;box-shadow:var(--shadow-sm);font-size:13.5px;line-height:1.85;color:var(--ink-2)}
+table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:10px 0}
+th{background:#f7fafc;text-align:left;padding:9px 12px;font-weight:700;color:var(--ink-2);border-bottom:1px solid var(--line)}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+code{background:#f1f4f7;border-radius:5px;padding:1px 5px;font-size:12px;font-family:"SF Mono",Menlo,monospace;color:#b8446a}
+.scrollx{overflow-x:auto}
+
+/* ---- 手机框（基准 390px）---- */
+.row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+.pcol{flex:0 0 340px;max-width:100%}
+.cap{font-size:13px;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.cap .no{background:var(--primary-deep);color:#fff;border-radius:7px;padding:2px 8px;font-size:11px;font-weight:800}
+.capsub{font-size:11.5px;color:var(--muted);margin:-3px 0 9px;line-height:1.6}
+.phone{width:340px;height:700px;border-radius:32px;overflow:hidden;position:relative;background:#fff;box-shadow:var(--shadow);border:1px solid var(--line)}
+.phone .nav{height:46px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:800;border-bottom:1px solid var(--line)}
+.phone .scr{padding:12px;height:calc(100% - 46px);overflow:hidden}
+
+/* ============ 内联决策卡（勿删；细则见 SPEC_GUIDE § 五·B）============ */
+.dqbar{position:sticky;top:0;z-index:200;margin:0 -26px 18px;padding:11px 26px;
+  background:rgba(238,242,246,.94);backdrop-filter:blur(10px);border-bottom:1px solid #d7e3ec;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.dqbar .p-txt{font-size:13px;font-weight:800;white-space:nowrap}
+.dqbar .p-txt em{font-style:normal;color:var(--dq-open)}
+.dqbar .p-txt.all-done em{color:var(--dq-done)}
+.dqbar .p-track{flex:1;min-width:120px;height:8px;border-radius:5px;background:#d3e0ea;overflow:hidden}
+.dqbar .p-fill{height:100%;width:0;border-radius:5px;background:linear-gradient(90deg,#8ecfae,var(--dq-done));transition:width .25s}
+.dqbar button{font-size:12.5px;font-weight:700;padding:7px 15px;border-radius:19px;cursor:pointer;
+  border:1px solid #c6d6e2;background:#fff;color:var(--ink-2);white-space:nowrap}
+.dqbar button:hover{border-color:var(--primary);color:var(--primary-deep)}
+.dqbar button.primary{background:var(--primary-deep);border-color:var(--primary-deep);color:#fff}
+.dqbar button.ghost-danger:hover{border-color:var(--danger);color:var(--danger)}
+
+.dqrail{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:190;
+  display:flex;flex-direction:column;gap:8px;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);
+  border:1px solid #dce7ef;border-radius:22px;padding:10px 8px;box-shadow:var(--shadow-sm)}
+.dqrail .rdot{width:26px;height:26px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:10.5px;font-weight:800;background:var(--dq-open-bg);color:var(--dq-open);border:1.5px solid var(--dq-open);transition:.15s}
+.dqrail .rdot:hover{transform:scale(1.12)}
+.dqrail .rdot.done{background:var(--dq-done-bg);color:var(--dq-done);border-color:var(--dq-done)}
+@media(max-width:1180px){.dqrail{display:none}}
+
+.dq{margin:16px 0 6px;border-radius:14px;border:1px solid #f0dcb8;border-left:6px solid var(--dq-open);
+  background:var(--dq-open-bg);padding:15px 18px 16px;scroll-margin-top:78px;box-shadow:var(--shadow-sm)}
+.dq.answered{border-color:#cbe8da;border-left-color:var(--dq-done);background:var(--dq-done-bg)}
+.dq-hd{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:4px}
+.dq-id{background:var(--dq-open);color:#fff;font-size:11.5px;font-weight:800;border-radius:7px;padding:2px 9px}
+.dq.answered .dq-id{background:var(--dq-done)}
+.dq-state{font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;background:#fff;color:var(--dq-open);border:1px solid #f0dcb8}
+.dq.answered .dq-state{color:var(--dq-done);border-color:#cbe8da}
+.dq:not(.answered) .dq-state{animation:dqPulse 2.2s ease-in-out infinite}
+@keyframes dqPulse{0%,100%{opacity:1}50%{opacity:.45}}
+.dq-q{font-size:14.5px;font-weight:800;line-height:1.6}
+.dq-sub{font-size:12.5px;color:var(--ink-2);line-height:1.8;margin-top:5px}
+.dq-sub code{background:#fff;border:1px solid #e6d9c0}
+.dq-opts{margin-top:11px;display:flex;flex-direction:column;gap:8px}
+.dq-opt{display:flex;align-items:flex-start;gap:10px;cursor:pointer;background:#fff;
+  border:1.5px solid #e8dcc4;border-radius:11px;padding:11px 13px;transition:.15s}
+.dq-opt:hover{border-color:var(--dq-open);box-shadow:0 2px 8px rgba(233,162,59,.13)}
+.dq-opt input{width:17px;height:17px;margin-top:2px;flex:none;accent-color:var(--dq-done);cursor:pointer}
+.dq-opt.sel{border-color:var(--dq-done);background:var(--dq-done-bg)}
+.dq-opt .o-body{flex:1;min-width:0}
+.dq-opt .o-t{font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.dq-opt .o-d{font-size:12px;color:var(--ink-2);line-height:1.75;margin-top:3px}
+.rec-chip{background:var(--primary-soft);color:var(--primary-deep);border:1px solid #cfe6f7;border-radius:5px;font-size:10.5px;font-weight:800;padding:1px 7px;white-space:nowrap}
+.cost-chip{background:#f4f7fa;color:#6c8092;border:1px solid #dde7ef;border-radius:5px;font-size:10.5px;font-weight:700;padding:1px 7px;white-space:nowrap}
+.dq-note{margin-top:10px}
+.dq-note label{display:block;font-size:11.5px;color:var(--muted);font-weight:700;margin-bottom:5px}
+.dq-note textarea{width:100%;min-height:52px;resize:vertical;border:1.5px solid #e8dcc4;border-radius:10px;
+  padding:9px 11px;font-size:13px;font-family:inherit;line-height:1.7;background:#fff}
+.dq-note textarea:focus{outline:none;border-color:var(--dq-open)}
+
+.sec-badge{display:inline-flex;align-items:center;gap:5px;background:var(--dq-open-bg);color:#a8720f;
+  border:1px solid #f0dcb8;border-radius:20px;font-size:11.5px;font-weight:800;padding:3px 11px}
+.sec-badge.done{background:var(--dq-done-bg);color:#2f7d58;border-color:#cbe8da}
+.sec-badge i{width:7px;height:7px;border-radius:50%;background:var(--dq-open);font-style:normal}
+.sec-badge.done i{background:var(--dq-done)}
+
+.dqsum-row{display:flex;align-items:flex-start;gap:12px;padding:11px 13px;border-radius:11px;background:#fff;
+  border:1px solid var(--line);border-left:4px solid var(--dq-open);margin-bottom:9px;cursor:pointer}
+.dqsum-row.done{border-left-color:var(--dq-done)}
+.dqsum-row .s-id{font-size:12px;font-weight:800;color:var(--ink);flex:none;width:34px}
+.dqsum-row .s-q{flex:1;min-width:0;font-size:12.5px;color:var(--ink-2);line-height:1.7}
+.dqsum-row .s-a{flex:none;max-width:46%;font-size:12.5px;font-weight:800;color:var(--dq-done);text-align:right;line-height:1.7}
+.dqsum-row:not(.done) .s-a{color:var(--dq-open)}
+.dqsum-row .s-a .s-note{display:block;font-weight:600;color:var(--ink-2);font-size:11.5px;margin-top:3px}
+.dq-out{width:100%;min-height:130px;resize:vertical;margin-top:12px;border:1.5px solid var(--line);border-radius:12px;
+  padding:12px 14px;font-family:"SF Mono",Menlo,monospace;font-size:12.5px;line-height:1.85;background:#fbfdff}
+.dq-out:focus{outline:none;border-color:var(--primary)}
+.copy-hint{font-size:12px;color:var(--muted);margin-top:9px;line-height:1.8}
+.toast{position:fixed;left:50%;bottom:38px;transform:translateX(-50%) translateY(14px);background:rgba(34,48,63,.94);
+  color:#fff;font-size:13px;font-weight:700;padding:11px 22px;border-radius:24px;z-index:400;opacity:0;pointer-events:none;transition:.22s}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+<style>
+/* —— 本报告特有：桌面端图表帧、证据表、红线卡 —— */
+.chart{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 20px 12px;box-shadow:var(--shadow-sm);margin:10px 0}
+.chart .ct{font-size:13.5px;font-weight:800;color:var(--ink);display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px}
+.chart .ct .no{background:var(--primary-deep);color:#fff;border-radius:7px;padding:2px 8px;font-size:11px}
+.chart .cs{font-size:12px;color:var(--muted);line-height:1.7;margin:2px 0 10px}
+.real{background:#eef7f2;color:#2f7d58;border:1px solid #cbe8da;border-radius:5px;font-size:10.5px;font-weight:800;padding:1px 7px}
+.mock{background:#fff4e2;color:#a8720f;border:1px solid #f0dcb8;border-radius:5px;font-size:10.5px;font-weight:800;padding:1px 7px}
+.verdict{display:flex;gap:16px;align-items:flex-start;background:linear-gradient(135deg,#f2faf6,#eef7ff);
+  border:1px solid #cbe8da;border-left:6px solid var(--dq-done);border-radius:16px;padding:20px 24px;margin:14px 0 6px;box-shadow:var(--shadow-sm)}
+.verdict .vi{font-size:34px;line-height:1;flex:none}
+.verdict h3{margin:0 0 6px;font-size:18px;font-weight:800;color:var(--ink)}
+.verdict p{margin:0 0 8px;font-size:13.5px;line-height:1.9;color:var(--ink-2)}
+.verdict p:last-child{margin-bottom:0}
+.red{background:#fef5f4;border:1px solid #f3d4d1;border-left:6px solid var(--danger);border-radius:14px;padding:15px 19px;margin:12px 0}
+.red .rt{font-size:14px;font-weight:800;color:#b4453c;display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.red .rt .tag{background:var(--danger);color:#fff;border-radius:6px;font-size:11px;padding:2px 8px}
+.red p{margin:5px 0;font-size:13px;line-height:1.85;color:var(--ink-2)}
+.amber{background:#fffaf0;border:1px solid #f0dcb8;border-left:6px solid var(--dq-open);border-radius:14px;padding:15px 19px;margin:12px 0}
+.amber .rt{font-size:14px;font-weight:800;color:#a8720f;display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.amber .rt .tag{background:var(--dq-open);color:#fff;border-radius:6px;font-size:11px;padding:2px 8px}
+.amber p{margin:5px 0;font-size:13px;line-height:1.85;color:var(--ink-2)}
+.ok{color:#2f7d58;font-weight:800} .no{color:#b4453c;font-weight:800} .warn{color:#a8720f;font-weight:800}
+pre.log{background:#1e2a36;color:#c8d6e2;border-radius:11px;padding:14px 17px;font-family:"SF Mono",Menlo,monospace;
+  font-size:11.5px;line-height:1.75;overflow-x:auto;margin:10px 0}
+pre.log b{color:#ffb454;font-weight:700}
+pre.log i{color:#7fd1a8;font-style:normal}
+.kpis{display:flex;gap:13px;flex-wrap:wrap;margin:12px 0}
+.kpi{flex:1;min-width:158px;background:#fff;border:1px solid var(--line);border-radius:13px;padding:13px 16px;box-shadow:var(--shadow-sm)}
+.kpi .k{font-size:11px;color:var(--muted);font-weight:700;line-height:1.5}
+.kpi .v{font-size:22px;font-weight:800;color:var(--ink);margin:4px 0 1px;letter-spacing:-.5px}
+.kpi .n{font-size:11px;color:var(--ink-2);line-height:1.6}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:18px;margin:12px 0}
+.vcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px 17px;box-shadow:var(--shadow-sm)}
+.vcard .vh{font-size:13.5px;font-weight:800;color:var(--ink);display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.vcard .vh .no{background:var(--primary-deep);color:#fff;border-radius:7px;padding:2px 8px;font-size:11px}
+.vcard .vs{font-size:11.5px;color:var(--muted);line-height:1.7;margin-bottom:9px}
+.vcard ul{margin:9px 0 0;padding-left:17px;font-size:12px;color:var(--ink-2);line-height:1.85}
+.flow{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:var(--shadow-sm);overflow-x:auto}
+td .ok,td .no,td .warn{white-space:nowrap}
+.note{font-size:12px;color:var(--muted);line-height:1.85;margin:8px 0}
+h3.sub{font-size:15px;font-weight:800;margin:22px 0 8px;color:var(--ink)}
+
+/* —— 已定结论块（决策卡拍板后并回正文的形态）—— */
+.dc{margin:16px 0 6px;border-radius:14px;border:1px solid #cbe8da;border-left:6px solid var(--dq-done);
+  background:var(--dq-done-bg);padding:15px 18px 16px;box-shadow:var(--shadow-sm)}
+.dc-hd{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:5px}
+.dc-id{background:var(--dq-done);color:#fff;font-size:11.5px;font-weight:800;border-radius:7px;padding:2px 9px}
+.dc-state{font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;background:#fff;color:var(--dq-done);border:1px solid #cbe8da}
+.dc-q{font-size:14.5px;font-weight:800;line-height:1.6;color:var(--ink)}
+.dc-a{font-size:13.5px;font-weight:800;color:#2f7d58;margin-top:7px;line-height:1.7}
+.dc-why{font-size:12.5px;color:var(--ink-2);line-height:1.85;margin-top:6px}
+.dc-why b{color:var(--ink)}
+.usr{background:#fff;border:1px solid #cbe8da;border-radius:9px;padding:8px 12px;margin-top:8px;
+  font-size:12.5px;color:var(--ink-2);line-height:1.75}
+.usr .who{font-size:10.5px;font-weight:800;color:var(--dq-done);display:block;margin-bottom:2px}
+table.sumt td:first-child{font-weight:800;color:var(--ink);white-space:nowrap}
+table.sumt td:nth-child(2){font-weight:700;color:#2f7d58}
+</style>
+</head>
+
+<body>
+<div class="doc">
+
+  <div class="doc-head">
+    <h1>A 股板块资金流向图表 — 可行性分析</h1>
+    <div class="sub">
+      <span class="pill base" style="background:#f2faf6;color:#2f7d58">已定稿 v1 · 五题全部拍板</span><span class="pill base">sanhu · 桌面端 Web · 2026-08-15</span><br>
+      结论基于 <b>2026-08-15 当场实测</b>，不是纸面推演：所有接口都真打过，图表里的数字全部来自 8 月 14 日收盘的真实返回值。<br>
+      <b>2026-08-16 修订：</b>红线 1 的归因反复了三轮，最终结论是「push2 按 IP 封禁，与地域无关」，中间那版「境外 IP 被拒」是错的（错在用境外服务量出口 IP）；
+      Q5 的图表库选型也因「项目没有图表库」这个前提有误而重判。两处都写明了原委和错在哪，没有静默改掉。<br>
+      <b>本稿已定稿</b> —— 原来的 5 张决策卡已按你的答复并回正文，形态见各节的绿色「已定」块；汇总见第十节。
+    </div>
+  </div>
+
+  <!-- ════════ 一、结论先行 ════════ -->
+  <section>
+    <h2 class="sec">一、结论先行</h2>
+
+    <div class="verdict">
+      <div class="vi">✅</div>
+      <div>
+        <h3>可行。而且比你要求的「半天一次」能做得好得多 —— 但「实时」这个词得换掉。</h3>
+        <p><b>好消息比预期大：</b>东财的分时资金流接口<b>一次请求就返回当日全部 240 个分钟点</b>（09:31→15:00 的累计净流入曲线）。
+        也就是说，要画「分钟级曲线」<b>根本不需要每分钟去请求一次</b> —— 收盘后打一次就把全天的分钟数据拿全了。
+        这一条直接把「想要细粒度」和「怕被封」这对矛盾解开了。</p>
+        <p><b>需要留意的约束：</b>东财对 <code>push2</code> 有限流，这在项目里早有两处独立记录 ——
+        <code>holdings_fetcher.go:109</code>「刷 20 只基金就是 200 个请求，实测会被限流，持续数分钟」、
+        <code>global.go:20</code>「已被 fundgz 下线、hycc 失效、push2 限流各坑过一次」。
+        所以抓取节奏必须压得很低，方案设计以此为前提。
+        <b>另有一条与限流无关但症状相同的坑，见第四节红线 1 的更正说明。</b></p>
+        <p><b>推荐路径：</b>盘中每 30 分钟取一次全板块排行（8 次/天，每次仅 1 个 HTTP 请求），
+        用户点开某个板块时按需取它的分时曲线。日均请求量 <b>&lt; 50 次</b> ——
+        对比项目已有记录里「200 个请求会被限流」，这个量级留了很宽的余量。
+        既满足你说的「半天一次」下限，实际体验接近准实时。</p>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="k">一次请求能拿到</div><div class="v">496 个</div><div class="n">行业板块全量，含主力/超大/大/中/小单净额与占比</div></div>
+      <div class="kpi"><div class="k">分时粒度</div><div class="v">240 点/日</div><div class="n">每分钟 1 点，单次请求返回全天</div></div>
+      <div class="kpi"><div class="k">现成历史深度</div><div class="v">120 天</div><div class="n">东财只给半年，再往前必须自己落库积累</div></div>
+      <div class="kpi"><div class="k">设计请求量</div><div class="v">约 13 次/天</div><div class="n">盘中每 30 分钟 1 个请求，远低于限流阈值</div></div>
+      <div class="kpi"><div class="k">预估工作量</div><div class="v">3–4 人日</div><div class="n">抓取 + 落库 + API + 前端图表</div></div>
+    </div>
+
+    <p class="note">下面每一节都先给证据、再给结论。真正需要你拍板的岔路一共 <b>5 个</b>（Q1–Q5），
+    都内联在对应的方案旁边，右侧浮标可以直接跳。</p>
+  </section>
+
+  <!-- ════════ 二、方法论 ════════ -->
+  <section>
+    <h2 class="sec">二、先说清楚：「资金流入」不是钱进出</h2>
+
+    <div class="card">
+      <p style="margin-top:0">这一节不是学术洁癖。做这个功能如果不把口径讲清楚，图表会<b>直接误导决策</b> —— 而这个项目的定位是决策辅助工具，不是看图软件。</p>
+
+      <p><b>每一笔成交都有买方和卖方，钱没有净进出。</b>「主力净流入 139 亿」不代表有 139 亿资金进了这个板块。
+      它的真实含义是：<b>按单笔成交金额分档之后，大额成交里「主动买」比「主动卖」多出 139 亿的成交额</b>。
+      主动买 / 主动卖靠成交价贴买一还是卖一来判定。所以它是一个<b>推断出来的统计指标</b>，不是资金流水。</p>
+
+      <p><b>东财的分档口径</b>（其它数据商定义不同，这正是下面「不可比」的原因）：
+      超大单 ≥100 万元、大单 20–100 万元、中单 4–20 万元、小单 &lt;4 万元；<b>主力 = 超大单 + 大单</b>。</p>
+    </div>
+
+    <div class="chart">
+      <div class="ct"><span class="no">E1</span>五档净额的实测结构 <span class="real">真实数据</span></div>
+      <div class="cs">通信板块（BK1215）2026-08-14 收盘。两条实测校验写在图上 —— 它们正好印证了上面两句话。</div>
+      <svg viewBox="0 0 1000 180" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><text x="0" y="14" font-size="11" fill="#93a3b3">通信板块 2026-08-14 五档净额（亿元）· 主力 = 超大单 + 大单（实测精确相等）</text><text x="156" y="43" font-size="12.5" font-weight="700" fill="#22303f">超大单 &gt;100万</text><rect x="470.0" y="29" width="300.0" height="20" rx="4" fill="#e2685f"/><text x="779.0" y="43" font-size="12" font-weight="800" fill="#e2685f" text-anchor="start">+122.23</text><text x="156" y="77" font-size="12.5" font-weight="700" fill="#22303f">大单 20–100万</text><rect x="470.0" y="63" width="41.3" height="20" rx="4" fill="#eb8f88"/><text x="520.3" y="77" font-size="12" font-weight="800" fill="#eb8f88" text-anchor="start">+16.84</text><text x="156" y="111" font-size="12.5" font-weight="700" fill="#22303f">中单 4–20万</text><rect x="293.2" y="97" width="176.8" height="20" rx="4" fill="#8fc4ac"/><text x="284.2" y="111" font-size="12" font-weight="800" fill="#8fc4ac" text-anchor="end">-72.04</text><text x="156" y="145" font-size="12.5" font-weight="700" fill="#22303f">小单 &lt;4万</text><rect x="306.4" y="131" width="163.6" height="20" rx="4" fill="#3f9e77"/><text x="297.4" y="145" font-size="12" font-weight="800" fill="#3f9e77" text-anchor="end">-66.67</text><line x1="470" y1="26" x2="470" y2="162" stroke="#54687c" stroke-width="1.3"/><text x="470" y="180" font-size="11" fill="#93a3b3" text-anchor="middle">0</text><text x="730" y="172" font-size="11.5" font-weight="700" fill="#54687c">四档相加 = <tspan font-weight="800" fill="#a8720f">+0.35 亿</tspan>，不是 0 —— 说明有未被分类的成交</text></svg>
+    </div>
+
+    <div class="card">
+      <p style="margin-top:0"><b>实测校验一：主力 = 超大单 + 大单，精确成立。</b>
+      122.23 + 16.84 = 139.07，与接口返回的主力净额<b>差 0.0000 亿</b>。说明分档是硬规则，不是估算。</p>
+      <p><b>实测校验二：四档相加 ≠ 0，而是 +0.35 亿。</b>
+      如果这真是「资金进出」，全市场各档相加必须恒为零。实际留下 0.25% 的残差，
+      说明有一部分成交<b>没有被归入任何一档</b>（集合竞价、无法判定主动方向的中性盘）。
+      这是「它是统计推断而非流水账」最直接的证据。</p>
+      <p><b>还有一个跨源不可比的实证。</b>同一只亨通光电（600487）、同一天：
+      东财给的主力净流入是 <b>31.2 亿</b>，新浪的 <code>netamount</code> 是 <b>46.9 亿</b>，差了 50%。
+      两家都没错 —— 分档阈值和主动方向判定规则不一样。</p>
+      <p style="margin-bottom:0"><b>因此产品上必须守住两条：</b>
+      ① <b>只做同源比较</b>，一个页面里绝不混用两家的数字；
+      ② 文案<b>不写「资金流入」四个字的字面义</b>，UI 上要有一句话解释它是什么。
+      这条对应下面 Q1 的「术语提示」要求。</p>
+    </div>
+  </section>
+
+  <!-- ════════ 三、实测证据 ════════ -->
+  <section>
+    <h2 class="sec">三、实测证据清单</h2>
+    <p class="note">2026-08-15（周六）实测。A 股休市，返回的是 8 月 14 日（周五）收盘数据，时间戳 <code>2026-08-14 15:39:31</code> —— 收盘后约 40 分钟仍在结算，这点对「盘后什么时候抓」有直接影响（见第六节）。</p>
+
+    <div class="scrollx"><table>
+      <tr><th style="width:19%">探测项</th><th style="width:27%">端点</th><th style="width:12%">结果</th><th>实测数据</th></tr>
+      <tr><td><b>行业板块全量</b></td><td><code>push2 /clist/get?fs=m:90+t:2</code></td><td class="ok">✅ 可用</td>
+          <td><b>496 个</b>板块，单请求 pz=500 一次取全；含 f62 主力净额、f184 主力占比、f66/f72/f78/f84 四档净额、f204/f205 主力流入最大股</td></tr>
+      <tr><td><b>概念板块全量</b></td><td><code>…fs=m:90+t:3</code></td><td class="ok">✅ 可用</td><td><b>504 个</b>，字段与行业板块完全一致</td></tr>
+      <tr><td><b>地域板块</b></td><td><code>…fs=m:90+t:1</code></td><td class="ok">✅ 可用</td><td><b>31 个</b>（省级），实用价值低</td></tr>
+      <tr><td><b>个股资金流</b></td><td><code>…fs=m:0+t:6,…</code></td><td class="ok">✅ 可用</td><td><b>5294 只</b>，同一套字段，可支撑「板块内谁在被买」下钻</td></tr>
+      <tr><td><b>板块分时资金流</b></td><td><code>push2 /stock/fflow/kline?klt=1</code></td><td class="ok">✅ 关键</td>
+          <td><b>240 点</b>（09:31→15:00 每分钟 1 点，<b>当日累计值</b>），响应 <b>60ms / 20KB</b>。<b>一次请求返回全天</b>，无需轮询</td></tr>
+      <tr><td><b>板块历史日线</b></td><td><code>push2his /stock/fflow/daykline</code></td><td class="warn">⚠️ 有限</td>
+          <td>只有 <b>120 个交易日</b>（2026-02-13 → 08-14），<code>lmt=0</code> 也拿不到更多。响应 147ms / 16KB</td></tr>
+      <tr><td><b>北向资金实时</b></td><td><code>push2 /kamt/get</code></td><td class="no">🔴 已废</td>
+          <td><code>dayNetAmtIn</code> 全部为 <b>0</b>，<code>status:3</code>；历史 kline 连续 5 个交易日全 <b>0.00</b></td></tr>
+      <tr><td><b>同花顺（备用源）</b></td><td><code>data.10jqka.com.cn/funds/gnzjl</code></td><td class="no">🔴 反爬</td>
+          <td>HTTP <b>401</b> + JS 跳转，需要 <code>hexin-v</code> token，逆向成本高且易失效</td></tr>
+      <tr><td><b>新浪（备用源）</b></td><td><code>vip.stock…MoneyFlow</code></td><td class="warn">⚠️ 部分</td>
+          <td>HTTP 200，<b>但只有个股、没有板块</b>，且口径与东财不一致（差 50%）</td></tr>
+      <tr><td><b>限流压测</b></td><td>30 次突发全量请求</td><td class="no">🔴 被封</td>
+          <td><b>0 成功 / 30 失败</b>，TLS 层掐连接，两个域名同时失联</td></tr>
+    </table></div>
+
+    <h3 class="sub">这份数据长什么样 —— 用真实返回值画出来</h3>
+
+    <div class="chart">
+      <div class="ct"><span class="no">E2</span>板块主力净流入排行 <span class="real">真实数据</span></div>
+      <div class="cs">2026-08-14 收盘，496 个行业板块按主力净额降序的前 9 名。通信系板块霸榜 —— 这天的市场特征一眼可见，说明这个图确实有信息量。</div>
+      <svg viewBox="0 0 1000 346" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><text x="0" y="14" font-size="11" fill="#93a3b3">主力净流入（亿元）· 2026-08-14 收盘 · 行业板块（东财 496 个中的前 9）</text><text x="157" y="42" font-size="12.5" font-weight="700" fill="#22303f" text-anchor="end">通信</text><rect x="168" y="29" width="682.0" height="20" rx="4" fill="#e2685f" opacity="0.92"/><text x="859.0" y="43" font-size="12" font-weight="800" fill="#e2685f">139.1</text><text x="992" y="43" font-size="11.5" font-weight="700" fill="#e2685f" text-anchor="end">+2.06%</text><text x="157" y="76" font-size="12.5" font-weight="700" fill="#22303f" text-anchor="end">通信设备</text><rect x="168" y="63" width="582.3" height="20" rx="4" fill="#e2685f" opacity="0.86"/><text x="759.3" y="77" font-size="12" font-weight="800" fill="#e2685f">118.7</text><text x="992" y="77" font-size="11.5" font-weight="700" fill="#e2685f" text-anchor="end">+2.37%</text><text x="157" y="110" font-size="12.5" font-weight="700" fill="#22303f" text-anchor="end">通信线缆及配套</text><rect x="168" y="97" width="269.9" height="20" rx="4" fill="#e2685f" opacity="0.81"/><text x="446.9" y="111" font-size="12" font-weight="800" fill="#e2685f">55.0</text><text x="992" y="111" font-size="11.5" font-weight="700" fill="#e2685f" text-anchor="end">+5.33%</text><text x="157" y="144" font-size="12.5" font-weight="700" fill="#22303f" text-anchor="end">通信网络设备及器件</text><rect x="168" y="131" width="235.4" height="20" rx="4" fill="#e2685f" opacity="0.76"/><text x="412.4" y="145" font-size="12" font-weight="800" fill="#e2685f">48.0</text><text x="992" y="145" font-size="11.5" font-weight="700" fill="#e2685f" text-anchor="end">+2.27%</text><text x="157" y="178" font-size="12.5" font-weight="700" fill="#22303f" text-anchor="end">通信服务</text><rect x="168" y="165" width="99.7" height="20" rx="4" fill="#e2685f" opacity="0.70"/><text x="276.7" y="179" font-size="12" font-weight="800" fill="#e2685f">20.3</text><text x="992" y="179" font-size="11.5" font-weight="700" fill="#e2685f" text-anchor="end">+1.32%</text><text x="157" y="212" font-size="12.5" font-weight="700" fill="#22303f" text-anchor="end">通信终端及配件</text><rect x="168" y="199" width="77.5" height="20" rx="4" fill="#e2685f" opacity="0.65"/><text x="254.5" y="213" font-size="12" font-weight="800" fill="#e2685f">15.8</text><text x="992" y="213" font-size="11.5" font-weight="700" fill="#e2685f" text-anchor="end">+1.90%</text><text x="157" y="246" font-size="12.5" font-weight="700" fill="#22303f" text-anchor="end">稀土</text><rect x="168" y="233" width="73.3" height="20" rx="4" fill="#e2685f" opacity="0.59"/><text x="250.3" y="247" font-size="12" font-weight="800" fill="#e2685f">14.9</text><text x="992" y="247" font-size="11.5" font-weight="700" fill="#e2685f" text-anchor="end">+5.82%</text><text x="157" y="280" font-size="12.5" font-weight="700" fill="#22303f" text-anchor="end">小金属</text><rect x="168" y="267" width="70.5" height="20" rx="4" fill="#e2685f" opacity="0.54"/><text x="247.5" y="281" font-size="12" font-weight="800" fill="#e2685f">14.4</text><text x="992" y="281" font-size="11.5" font-weight="700" fill="#e2685f" text-anchor="end">+2.02%</text><text x="157" y="314" font-size="12.5" font-weight="700" fill="#22303f" text-anchor="end">通信应用增值服务</text><rect x="168" y="301" width="66.8" height="20" rx="4" fill="#e2685f" opacity="0.48"/><text x="243.8" y="315" font-size="12" font-weight="800" fill="#e2685f">13.6</text><text x="992" y="315" font-size="11.5" font-weight="700" fill="#e2685f" text-anchor="end">+2.36%</text></svg>
+    </div>
+
+    <div class="chart">
+      <div class="ct"><span class="no">E3</span>分时累计净流入曲线 <span class="real">真实数据 · 240 点全量</span></div>
+      <div class="cs">通信板块 8-14 全天。这张图是本次分析里最重要的一张 —— 它同时回答了「能不能做细粒度」和「半天一次够不够」两个问题。</div>
+      <svg viewBox="0 0 1000 300" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><defs><linearGradient id="gr1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e2685f" stop-opacity=".30"/><stop offset="1" stop-color="#e2685f" stop-opacity=".02"/></linearGradient></defs><line x1="58" y1="266.0" x2="914" y2="266.0" stroke="#e4edf4" stroke-width="1"/><text x="50" y="270.0" font-size="11" fill="#93a3b3" text-anchor="end">-24</text><line x1="58" y1="204.0" x2="914" y2="204.0" stroke="#e4edf4" stroke-width="1"/><text x="50" y="208.0" font-size="11" fill="#93a3b3" text-anchor="end">21</text><line x1="58" y1="142.0" x2="914" y2="142.0" stroke="#e4edf4" stroke-width="1"/><text x="50" y="146.0" font-size="11" fill="#93a3b3" text-anchor="end">66</text><line x1="58" y1="80.0" x2="914" y2="80.0" stroke="#e4edf4" stroke-width="1"/><text x="50" y="84.0" font-size="11" fill="#93a3b3" text-anchor="end">111</text><line x1="58" y1="18.0" x2="914" y2="18.0" stroke="#e4edf4" stroke-width="1"/><text x="50" y="22.0" font-size="11" fill="#93a3b3" text-anchor="end">156</text><line x1="58" y1="233.6" x2="914" y2="233.6" stroke="#54687c" stroke-width="1.4"/><polygon points="58,233.6 58,235 62,237 65,240 69,241 72,240 76,239 79,239 83,236 87,234 90,233 94,231 97,230 101,231 105,232 108,231 112,231 115,232 119,233 122,233 126,233 130,235 133,236 137,237 140,238 144,238 148,239 151,241 155,241 158,242 162,242 165,242 169,241 173,240 176,239 180,238 183,237 187,237 191,237 194,236 198,236 201,236 205,237 208,238 212,239 216,238 219,238 223,237 226,236 230,235 233,235 237,233 241,230 244,225 248,224 251,222 255,220 259,217 262,215 266,210 269,208 273,205 276,202 280,199 284,198 287,195 291,191 294,188 298,185 302,183 305,179 309,177 312,172 316,170 319,169 323,167 327,166 330,166 334,165 337,165 341,165 345,164 348,163 352,163 355,162 359,162 362,162 366,162 370,162 373,162 377,161 380,161 384,161 388,161 391,161 395,162 398,162 402,162 405,162 409,163 413,163 416,164 420,164 423,165 427,165 430,165 434,165 438,165 441,164 445,164 448,164 452,162 456,161 459,161 463,160 466,160 470,160 473,160 477,160 481,159 484,159 488,155 491,154 495,153 499,153 502,153 506,153 509,153 513,153 516,153 520,153 524,154 527,154 531,154 534,154 538,154 542,154 545,154 549,154 552,154 556,155 559,155 563,155 567,155 570,156 574,156 577,157 581,157 584,156 588,156 592,156 595,155 599,154 602,152 606,150 610,150 613,149 617,147 620,144 624,141 627,140 631,137 635,136 638,133 642,131 645,127 649,125 653,124 656,123 660,122 663,122 667,121 670,120 674,118 678,116 681,115 685,113 688,111 692,110 696,109 699,97 703,95 706,94 710,94 713,94 717,94 721,93 724,92 728,91 731,91 735,91 739,90 742,90 746,89 749,89 753,88 756,87 760,85 764,84 767,84 771,83 774,82 778,81 781,80 785,80 789,80 792,80 796,78 799,77 803,76 807,75 810,74 814,73 817,72 821,72 824,72 828,71 832,71 835,71 839,70 842,70 846,70 850,69 853,69 857,68 860,67 864,67 867,67 871,65 875,64 878,58 882,56 885,54 889,52 893,49 896,47 900,45 903,42 907,42 910,42 914,42 914.0,233.6" fill="url(#gr1)"/><polyline points="58,235 62,237 65,240 69,241 72,240 76,239 79,239 83,236 87,234 90,233 94,231 97,230 101,231 105,232 108,231 112,231 115,232 119,233 122,233 126,233 130,235 133,236 137,237 140,238 144,238 148,239 151,241 155,241 158,242 162,242 165,242 169,241 173,240 176,239 180,238 183,237 187,237 191,237 194,236 198,236 201,236 205,237 208,238 212,239 216,238 219,238 223,237 226,236 230,235 233,235 237,233 241,230 244,225 248,224 251,222 255,220 259,217 262,215 266,210 269,208 273,205 276,202 280,199 284,198 287,195 291,191 294,188 298,185 302,183 305,179 309,177 312,172 316,170 319,169 323,167 327,166 330,166 334,165 337,165 341,165 345,164 348,163 352,163 355,162 359,162 362,162 366,162 370,162 373,162 377,161 380,161 384,161 388,161 391,161 395,162 398,162 402,162 405,162 409,163 413,163 416,164 420,164 423,165 427,165 430,165 434,165 438,165 441,164 445,164 448,164 452,162 456,161 459,161 463,160 466,160 470,160 473,160 477,160 481,159 484,159 488,155 491,154 495,153 499,153 502,153 506,153 509,153 513,153 516,153 520,153 524,154 527,154 531,154 534,154 538,154 542,154 545,154 549,154 552,154 556,155 559,155 563,155 567,155 570,156 574,156 577,157 581,157 584,156 588,156 592,156 595,155 599,154 602,152 606,150 610,150 613,149 617,147 620,144 624,141 627,140 631,137 635,136 638,133 642,131 645,127 649,125 653,124 656,123 660,122 663,122 667,121 670,120 674,118 678,116 681,115 685,113 688,111 692,110 696,109 699,97 703,95 706,94 710,94 713,94 717,94 721,93 724,92 728,91 731,91 735,91 739,90 742,90 746,89 749,89 753,88 756,87 760,85 764,84 767,84 771,83 774,82 778,81 781,80 785,80 789,80 792,80 796,78 799,77 803,76 807,75 810,74 814,73 817,72 821,72 824,72 828,71 832,71 835,71 839,70 842,70 846,70 850,69 853,69 857,68 860,67 864,67 867,67 871,65 875,64 878,58 882,56 885,54 889,52 893,49 896,47 900,45 903,42 907,42 910,42 914,42" fill="none" stroke="#e2685f" stroke-width="2.2" stroke-linejoin="round"/><text x="58.0" y="287" font-size="11" fill="#93a3b3" text-anchor="middle">09:31</text><text x="269.3" y="287" font-size="11" fill="#93a3b3" text-anchor="middle">10:30</text><text x="484.2" y="287" font-size="11" fill="#93a3b3" text-anchor="middle">11:30</text><text x="699.1" y="287" font-size="11" fill="#93a3b3" text-anchor="middle">14:00</text><text x="914.0" y="287" font-size="11" fill="#93a3b3" text-anchor="middle">15:00</text><line x1="484.2" y1="18" x2="484.2" y2="266" stroke="#e9a23b" stroke-width="1.6" stroke-dasharray="5 4"/><circle cx="484.2" cy="159.0" r="4.5" fill="#e9a23b"/><rect x="432.2" y="22" width="118" height="34" rx="7" fill="#fffaf0" stroke="#f0dcb8"/><text x="491.2" y="35" font-size="11" font-weight="700" fill="#a8720f" text-anchor="middle">11:30 半日快照</text><text x="491.2" y="49" font-size="11" font-weight="800" fill="#a8720f" text-anchor="middle">54.1 亿 = 全天 39%</text><circle cx="914.0" cy="42.0" r="4.5" fill="#e2685f"/><text x="923.0" y="36.0" font-size="12.5" font-weight="800" fill="#e2685f">139.1 亿</text><text x="923.0" y="51.0" font-size="10.5" fill="#93a3b3">收盘累计</text><text x="58" y="14" font-size="11" fill="#93a3b3">主力净流入（亿元 · 当日累计）</text></svg>
+    </div>
+
+    <div class="amber">
+      <div class="rt"><span class="tag">注意</span>「半天统计一次」会漏掉一多半</div>
+      <p>上图那条琥珀色虚线是 11:30。<b>上午收盘时主力累计只有 54.1 亿，而全天是 139.1 亿 —— 半日快照只捕捉到 39%。</b>
+      真正的主力买入发生在下午，尤其尾盘。</p>
+      <p>这是单板块单日样本，不能当统计规律；但它足以说明一个产品判断：
+      <b>「一天只在中午取一次」的方案，信息价值明显低于「一天取几次」</b>。
+      而由于分时接口一次给全天，多取几次的成本几乎为零 —— 所以没必要为了省请求而牺牲这个。</p>
+    </div>
+
+    <div class="chart">
+      <div class="ct"><span class="no">E4</span>120 个交易日的历史资金流 <span class="real">真实数据</span></div>
+      <div class="cs">通信板块 2026-02-13 → 08-14，红柱=主力净流入、绿柱=净流出（鼠标悬停有数值）。这就是东财能给的<b>全部</b>历史 —— 右端到头了，左端也到头了。</div>
+      <svg viewBox="0 0 1000 260" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><line x1="58" y1="226.0" x2="980" y2="226.0" stroke="#e4edf4"/><text x="50" y="230.0" font-size="11" fill="#93a3b3" text-anchor="end">-464</text><line x1="58" y1="174.0" x2="980" y2="174.0" stroke="#e4edf4"/><text x="50" y="178.0" font-size="11" fill="#93a3b3" text-anchor="end">-280</text><line x1="58" y1="122.0" x2="980" y2="122.0" stroke="#e4edf4"/><text x="50" y="126.0" font-size="11" fill="#93a3b3" text-anchor="end">-95</text><line x1="58" y1="70.0" x2="980" y2="70.0" stroke="#e4edf4"/><text x="50" y="74.0" font-size="11" fill="#93a3b3" text-anchor="end">89</text><line x1="58" y1="18.0" x2="980" y2="18.0" stroke="#e4edf4"/><text x="50" y="22.0" font-size="11" fill="#93a3b3" text-anchor="end">273</text><path d="M66 83h6.5v12h-6.5zM82 77h6.5v18h-6.5zM97 92h6.5v3h-6.5zM120 82h6.5v13h-6.5zM143 79h6.5v17h-6.5zM174 90h6.5v5h-6.5zM189 65h6.5v30h-6.5zM205 88h6.5v7h-6.5zM220 83h6.5v12h-6.5zM228 70h6.5v25h-6.5zM251 87h6.5v8h-6.5zM266 78h6.5v17h-6.5zM281 70h6.5v26h-6.5zM297 69h6.5v26h-6.5zM343 72h6.5v23h-6.5zM351 94h6.5v1h-6.5zM374 64h6.5v31h-6.5zM427 94h6.5v1h-6.5zM435 70h6.5v25h-6.5zM443 89h6.5v6h-6.5zM466 88h6.5v7h-6.5zM520 76h6.5v19h-6.5zM527 87h6.5v9h-6.5zM550 67h6.5v28h-6.5zM573 50h6.5v45h-6.5zM581 79h6.5v16h-6.5zM612 70h6.5v25h-6.5zM643 52h6.5v43h-6.5zM650 90h6.5v5h-6.5zM666 76h6.5v19h-6.5zM719 64h6.5v32h-6.5zM765 88h6.5v7h-6.5zM773 65h6.5v30h-6.5zM796 72h6.5v23h-6.5zM835 83h6.5v12h-6.5zM865 92h6.5v3h-6.5zM896 78h6.5v17h-6.5zM904 92h6.5v3h-6.5zM911 32h6.5v63h-6.5zM927 90h6.5v5h-6.5zM950 93h6.5v3h-6.5zM958 59h6.5v36h-6.5zM965 93h6.5v2h-6.5zM973 56h6.5v39h-6.5z" fill="#e2685f" opacity=".88"/><path d="M59 95h6.5v16h-6.5zM74 95h6.5v11h-6.5zM89 95h6.5v33h-6.5zM105 95h6.5v31h-6.5zM112 95h6.5v18h-6.5zM128 95h6.5v15h-6.5zM135 95h6.5v23h-6.5zM151 95h6.5v17h-6.5zM158 95h6.5v22h-6.5zM166 95h6.5v7h-6.5zM182 95h6.5v41h-6.5zM197 95h6.5v11h-6.5zM212 95h6.5v25h-6.5zM235 95h6.5v26h-6.5zM243 95h6.5v8h-6.5zM258 95h6.5v22h-6.5zM274 95h6.5v19h-6.5zM289 95h6.5v16h-6.5zM304 95h6.5v7h-6.5zM312 95h6.5v13h-6.5zM320 95h6.5v15h-6.5zM328 95h6.5v18h-6.5zM335 95h6.5v36h-6.5zM358 95h6.5v15h-6.5zM366 95h6.5v21h-6.5zM381 95h6.5v36h-6.5zM389 95h6.5v51h-6.5zM397 95h6.5v12h-6.5zM404 95h6.5v36h-6.5zM412 95h6.5v2h-6.5zM420 95h6.5v21h-6.5zM450 95h6.5v3h-6.5zM458 95h6.5v29h-6.5zM474 95h6.5v8h-6.5zM481 95h6.5v43h-6.5zM489 95h6.5v8h-6.5zM497 95h6.5v19h-6.5zM504 95h6.5v15h-6.5zM512 95h6.5v78h-6.5zM535 95h6.5v39h-6.5zM543 95h6.5v14h-6.5zM558 95h6.5v3h-6.5zM566 95h6.5v24h-6.5zM589 95h6.5v19h-6.5zM596 95h6.5v32h-6.5zM604 95h6.5v31h-6.5zM619 95h6.5v41h-6.5zM627 95h6.5v38h-6.5zM635 95h6.5v28h-6.5zM658 95h6.5v10h-6.5zM673 95h6.5v9h-6.5zM681 95h6.5v53h-6.5zM689 95h6.5v17h-6.5zM696 95h6.5v5h-6.5zM704 95h6.5v117h-6.5zM712 95h6.5v48h-6.5zM727 95h6.5v57h-6.5zM735 95h6.5v58h-6.5zM742 95h6.5v9h-6.5zM750 95h6.5v41h-6.5zM758 95h6.5v15h-6.5zM781 95h6.5v17h-6.5zM789 95h6.5v39h-6.5zM804 95h6.5v9h-6.5zM812 95h6.5v33h-6.5zM819 95h6.5v56h-6.5zM827 95h6.5v12h-6.5zM842 95h6.5v27h-6.5zM850 95h6.5v26h-6.5zM858 95h6.5v22h-6.5zM873 95h6.5v60h-6.5zM881 95h6.5v4h-6.5zM888 95h6.5v37h-6.5zM919 95h6.5v2h-6.5zM934 95h6.5v9h-6.5zM942 95h6.5v49h-6.5z" fill="#3f9e77" opacity=".88"/><line x1="58" y1="95.1" x2="980" y2="95.1" stroke="#54687c" stroke-width="1.3"/><text x="61.8" y="247" font-size="11" fill="#93a3b3" text-anchor="middle">02-13</text><text x="215.5" y="247" font-size="11" fill="#93a3b3" text-anchor="middle">03-23</text><text x="369.2" y="247" font-size="11" fill="#93a3b3" text-anchor="middle">04-21</text><text x="522.8" y="247" font-size="11" fill="#93a3b3" text-anchor="middle">05-22</text><text x="676.5" y="247" font-size="11" fill="#93a3b3" text-anchor="middle">06-22</text><text x="830.2" y="247" font-size="11" fill="#93a3b3" text-anchor="middle">07-20</text><text x="978.0" y="247" font-size="11" fill="#93a3b3" text-anchor="end">08-14</text><text x="58" y="14" font-size="11" fill="#93a3b3">主力净流入（亿元 · 每日）· 东财只给到 120 个交易日</text></svg>
+    </div>
+  </section>
+
+  <!-- ════════ 四、三条红线 ════════ -->
+  <section>
+    <h2 class="sec">四、三条红线（必须在开工前认下来）</h2>
+
+    <div class="red">
+      <div class="rt"><span class="tag">红线 1</span>push2 会按 IP 封禁，量级远超注释里写的「数分钟」</div>
+
+      <p><b>实测证据（2026-08-16，同一台机器、同一条直连出口 218.82.106.180 上海电信）：</b></p>
+      <pre class="log">fund.eastmoney.com/pingzhongdata/000001.js   <i>净值（项目在用）</i>   HTTP <i>200</i>  757 KB  ✓
+fundf10.eastmoney.com/jbgk_000001.html       <i>基金档案</i>           HTTP <i>200</i>   50 KB  ✓
+push2.eastmoney.com/api/qt/clist/get         <i>行情/资金流</i>        HTTP <b>000</b>          ✗
+push2his.eastmoney.com/api/qt/...            <i>历史行情</i>           HTTP <b>000</b>          ✗
+
+同一时刻，从另一台机器（不同 IP）请求 push2 → <i>200</i>
+
+<b>→ 同一个 IP 上，fund 通而 push2 不通；换个 IP，push2 就通。
+   所以封禁作用在「IP × push2」这个组合上，与地域无关（该 IP 本就是国内电信）。</b></pre>
+
+      <p><b>起因与时长：</b>这个 IP 是在我做了一次 <b>30 次/30 秒</b>的突发压测之后开始不通的，
+      时间高度吻合，且 push2 限流在项目里早有独立记录：
+      <code>holdings_fetcher.go:109</code>「刷 20 只基金就是 200 个请求，实测会被东财限流」、
+      <code>global.go:20</code>「push2 限流坑过一次」。
+      严格说单次事件证明不了因果，但这是目前最站得住的解释。
+      <b>实测已持续 9 小时以上仍未解封 —— 老注释里的「持续数分钟」明显偏乐观，按小时计更稳妥。</b></p>
+
+      <div style="background:#fff;border:1px solid #f3d4d1;border-radius:10px;padding:12px 15px;margin:10px 0;font-size:12.5px;line-height:1.85;color:#54687c">
+        <b style="color:#b4453c">排查陷阱（我在这上面栽过，写下来免得重蹈）：</b><br>
+        判断「是不是我的 IP 被封了」时，<b>不要用 <code>api.ipify.org</code> 这类境外服务去量出口 IP</b>。
+        Clash 等工具默认是<b>分流模式</b>：国内域名走直连（真实宽带 IP），境外域名走代理（节点 IP）。
+        用境外服务量出来的是<b>代理节点的 IP</b>，和东财实际看到的完全是两回事 ——
+        我据此误判成「东财拒绝境外 IP」，绕了一圈。
+        <br>正确做法：用<b>国内</b>的回显服务，路由才和东财一致 —— <code>curl cip.cc</code>。
+      </div>
+
+      <p><b>对策（三轮反复后不变的部分）：</b>照抄 <code>holdings_fetcher.go</code> 已验证的模式
+      「缓存优先 → 查库 → 都没有才联网，且放慢节奏」。全量板块排行一次只要 <b>1 个</b>请求，
+      盘中每 30 分钟一次 = 8 次/天；分时曲线按用户点击按需取，<b>日均 &lt;50 次</b>。
+      另外两条已落进代码：① 失败<b>指数退避 + 直接降级到缓存</b>，绝不原地重试
+      （<code>client.go</code> 原本固定 1 秒重试 3 次，限流场景下等于火上浇油，已改）；
+      ② 兜底判断不能只认「返回空」，「连接失败」也要走降级分支。
+      <b>封禁按小时计这一点，让降级链条（内存 → 数据库）从「锦上添花」变成了必需品。</b></p>
+    </div>
+
+    <div class="amber">
+      <div class="rt"><span class="tag">已解决</span>找到了替代源：push2delay 是同一套 API 的延时版</div>
+      <p><b>2026-08-16 实测：push2 全挂时，<code>push2delay.eastmoney.com</code> 照常 200。</b>
+      它是<b>同一套 API 路径、同样的字段、同样的数值</b>，只是行情延时 —— 对「盘中每 30 分钟看一次」
+      这个用法，延时几分钟看不出来。已实现为自动降级，主源失败就切备源，用户无感。</p>
+      <div class="scrollx"><table>
+        <tr><th style="width:22%">端点</th><th style="width:16%">push2（主）</th><th style="width:20%">push2delay（备）</th><th>说明</th></tr>
+        <tr><td>板块榜单 clist</td><td class="no">000</td><td class="ok">✅ 200</td>
+            <td><b>单页上限 100 条</b>（主源 pz=600 一次拿全 496）。对策：<code>po=1</code> 取流入前 100、<code>po=0</code> 取流出前 100，
+            <b>两个请求覆盖榜单两端</b> —— 中间那段本来也没人看</td></tr>
+        <tr><td>分时 fflow/kline</td><td class="no">000</td><td class="ok">✅ 200</td>
+            <td>完整 <b>240 个点</b>，末点值与主源逐字段一致</td></tr>
+        <tr><td>历史日线 daykline</td><td class="no">000</td><td class="no">❌ 只返回 1 条</td>
+            <td><b>没有可用备胎</b>。另试过 push2hisdelay（302 跳转）、quote、hsmarketwg（均 404）</td></tr>
+      </table></div>
+      <p><b>实测效果（空库 + 主源挂掉的真实环境）：</b>榜单拿到 200 个板块（流入 100 / 流出 100），
+      去重后 111 组；分时 240 点正常渲染。<b>唯一缺口是 120 天历史日线</b> ——
+      但那部分随着每日落库会自己长出来，而且这恰好又证明了 Q4「必须落库」的价值：
+      <b>攒得越久，对这个唯一没有备胎的接口依赖越小。</b></p>
+    </div>
+
+    <div class="red">
+      <div class="rt"><span class="tag">红线 2</span>北向资金这条线已经没有数据了</div>
+      <p>「北向资金 / 外资流向」是这类功能最常被要求的一栏。实测结果是<b>它已经不存在了</b>：</p>
+      <pre class="log">/api/qt/kamt/get     → hk2sh.dayNetAmtIn = <b>0.0</b>   status: 3
+                       hk2sz.dayNetAmtIn = <b>0.0</b>
+/api/qt/kamt.kline   → hk2sh: 08-10,<b>0.00</b>  08-11,<b>0.00</b>  08-12,<b>0.00</b>
+                              08-13,<b>0.00</b>  08-14,<b>0.00</b>   <i># 连续 5 个交易日全 0</i></pre>
+      <p>接口还活着、还返回 200，但值恒为 0 —— 沪深港通自 2024 年 8 月起<b>已停止实时披露每日买卖净额</b>，
+      现在只按季度公布持股。<b>如果照着旧教程或旧代码抄，会得到一个「永远是 0」的图表而不自知</b>，这是最危险的一种坏法。</p>
+      <p><b>对策：</b>这一栏<b>不做</b>。如果非要给「外资视角」，只能退到季度持股变动，那是完全不同的产品形态，本期不纳入。</p>
+    </div>
+
+    <div class="red">
+      <div class="rt"><span class="tag">红线 3</span>历史只有 120 天，想要更长必须自己攒</div>
+      <p><code>daykline</code> 接口带 <code>lmt=0</code>（不限条数）返回的仍然只有 <b>120 条</b>，
+      时间窗恰好是 2026-02-13 → 2026-08-14，约半年。这意味着：</p>
+      <p>· <b>今天就能有</b>：近半年的板块资金流趋势图，开箱即用。<br>
+         · <b>今天不可能有</b>：跨年度对比、「上一轮行情时这个板块的资金流长什么样」。<br>
+         · <b>想要长历史，唯一的办法是从现在开始每天落库</b> —— 一年后才有一年的数据，没有捷径。</p>
+      <p><b>对策：</b>这正是 Q4 要拍的板 —— 现在开始存，成本很低（约 25 MB/年）；不存的话一年后还是只有 120 天。</p>
+    </div>
+  </section>
+
+  <!-- ════════ 五、图表形态 + Q1 ════════ -->
+  <section>
+    <h2 class="sec">五、首屏长什么样（三个形态，同屏比）</h2>
+    <p class="note">本项目是<b>桌面端浏览器</b>（Go 单文件启动后自动开浏览器），不是小程序，所以下面用桌面卡片尺寸画，不套 390px 手机框。
+    三个变体都用 8-14 的真实数据画；流出侧因为抓取当时接口已不通、没取到反向榜，用占位并在图上标了。</p>
+
+    <div class="grid3">
+      <div class="vcard">
+        <div class="vh"><span class="no">A</span>双向排行榜 <span class="real">主推</span></div>
+        <div class="vs">左流出、右流入，各 10 条。点任一条展开该板块分时曲线 + 五档结构。</div>
+        <svg viewBox="0 0 440 300" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><rect x=".5" y=".5" width="439" height="299" rx="10" fill="#fff" stroke="#e4edf4"/><text x="16" y="24" font-size="12.5" font-weight="800" fill="#22303f">今日板块资金流向</text><text x="424" y="24" font-size="10.5" fill="#93a3b3" text-anchor="end">08-14 收盘</text><line x1="16" y1="34" x2="424" y2="34" stroke="#e4edf4"/><text x="16" y="50" font-size="10.5" font-weight="700" fill="#e2685f">净流入 TOP</text><text x="424" y="50" font-size="10.5" font-weight="700" fill="#3f9e77" text-anchor="end">净流出 TOP</text><text x="16" y="71" font-size="10.5" fill="#54687c">通信</text><rect x="112" y="62" width="150" height="12" rx="3" fill="#e2685f" opacity="0.90"/><text x="267" y="72" font-size="10" font-weight="800" fill="#e2685f">139</text><text x="16" y="91" font-size="10.5" fill="#54687c">通信设备</text><rect x="112" y="82" width="128" height="12" rx="3" fill="#e2685f" opacity="0.81"/><text x="245" y="92" font-size="10" font-weight="800" fill="#e2685f">119</text><text x="16" y="111" font-size="10.5" fill="#54687c">通信线缆</text><rect x="112" y="102" width="59" height="12" rx="3" fill="#e2685f" opacity="0.72"/><text x="176" y="112" font-size="10" font-weight="800" fill="#e2685f">55</text><text x="16" y="131" font-size="10.5" fill="#54687c">通信网络设备</text><rect x="112" y="122" width="52" height="12" rx="3" fill="#e2685f" opacity="0.63"/><text x="169" y="132" font-size="10" font-weight="800" fill="#e2685f">48</text><text x="16" y="151" font-size="10.5" fill="#54687c">通信服务</text><rect x="112" y="142" width="22" height="12" rx="3" fill="#e2685f" opacity="0.54"/><text x="139" y="152" font-size="10" font-weight="800" fill="#e2685f">20</text><text x="16" y="171" font-size="10.5" fill="#54687c">稀土</text><rect x="112" y="162" width="16" height="12" rx="3" fill="#e2685f" opacity="0.45"/><text x="133" y="172" font-size="10" font-weight="800" fill="#e2685f">15</text><text x="424" y="71" font-size="10.5" fill="#54687c" text-anchor="end">板块 X</text><rect x="224" y="62" width="104" height="12" rx="3" fill="#3f9e77" opacity="0.90"/><text x="219" y="72" font-size="10" font-weight="800" fill="#3f9e77" text-anchor="end">-96</text><text x="424" y="91" font-size="10.5" fill="#54687c" text-anchor="end">板块 Y</text><rect x="251" y="82" width="77" height="12" rx="3" fill="#3f9e77" opacity="0.81"/><text x="246" y="92" font-size="10" font-weight="800" fill="#3f9e77" text-anchor="end">-71</text><text x="424" y="111" font-size="10.5" fill="#54687c" text-anchor="end">板块 Z</text><rect x="264" y="102" width="64" height="12" rx="3" fill="#3f9e77" opacity="0.72"/><text x="259" y="112" font-size="10" font-weight="800" fill="#3f9e77" text-anchor="end">-59</text><text x="424" y="131" font-size="10.5" fill="#54687c" text-anchor="end">板块 W</text><rect x="280" y="122" width="48" height="12" rx="3" fill="#3f9e77" opacity="0.63"/><text x="275" y="132" font-size="10" font-weight="800" fill="#3f9e77" text-anchor="end">-44</text><text x="424" y="151" font-size="10.5" fill="#54687c" text-anchor="end">板块 V</text><rect x="294" y="142" width="34" height="12" rx="3" fill="#3f9e77" opacity="0.54"/><text x="289" y="152" font-size="10" font-weight="800" fill="#3f9e77" text-anchor="end">-32</text><text x="424" y="171" font-size="10.5" fill="#54687c" text-anchor="end">板块 U</text><rect x="304" y="162" width="24" height="12" rx="3" fill="#3f9e77" opacity="0.45"/><text x="299" y="172" font-size="10" font-weight="800" fill="#3f9e77" text-anchor="end">-22</text><text x="220" y="200" font-size="9.5" fill="#93a3b3" text-anchor="middle">↑ 左右各 10 条，点任一条展开分时曲线</text><rect x="16" y="216" width="408" height="66" rx="8" fill="#f7fafc" stroke="#e4edf4"/><text x="28" y="236" font-size="10.5" font-weight="700" fill="#54687c">五档结构（选中板块）</text><rect x="30" y="248" width="86" height="10" rx="2" fill="#e2685f"/><text x="30" y="272" font-size="9.5" fill="#54687c">超大单 +122亿</text><rect x="128" y="248" width="86" height="10" rx="2" fill="#eb8f88"/><text x="128" y="272" font-size="9.5" fill="#54687c">大单 +17亿</text><rect x="226" y="248" width="86" height="10" rx="2" fill="#8fc4ac"/><text x="226" y="272" font-size="9.5" fill="#54687c">中单 -72亿</text><rect x="324" y="248" width="86" height="10" rx="2" fill="#3f9e77"/><text x="324" y="272" font-size="9.5" fill="#54687c">小单 -67亿</text></svg>
+        <ul>
+          <li><b>优点：</b>「今天谁在被买、谁在被卖」一眼给到，这正是需求原话</li>
+          <li><b>优点：</b>纯条形图，手写 SVG 即可，<b>零依赖</b></li>
+          <li><b>缺点：</b>一次只能看 20 个，看不到全局分布</li>
+        </ul>
+      </div>
+      <div class="vcard">
+        <div class="vh"><span class="no">B</span>资金热力图</div>
+        <div class="vs">面积 = 净额绝对值，颜色 = 流入/流出，一屏铺满 496 个板块。</div>
+        <svg viewBox="0 0 440 300" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><rect x=".5" y=".5" width="439" height="299" rx="10" fill="#fff" stroke="#e4edf4"/><text x="16" y="24" font-size="12.5" font-weight="800" fill="#22303f">板块资金热力图</text><text x="424" y="24" font-size="10.5" fill="#93a3b3" text-anchor="end">面积=净额 · 色=方向</text><line x1="16" y1="34" x2="424" y2="34" stroke="#e4edf4"/><rect x="16" y="44" width="168" height="120" rx="4" fill="#e2685f" opacity="0.86"/><text x="100.0" y="103.0" font-size="11" font-weight="800" fill="#fff" text-anchor="middle">通信</text><text x="100.0" y="117.0" font-size="10" fill="#fff" opacity=".9" text-anchor="middle">+139亿</text><rect x="188" y="44" width="150" height="120" rx="4" fill="#e2685f" opacity="0.86"/><text x="263.0" y="103.0" font-size="11" font-weight="800" fill="#fff" text-anchor="middle">通信设备</text><text x="263.0" y="117.0" font-size="10" fill="#fff" opacity=".9" text-anchor="middle">+119亿</text><rect x="342" y="44" width="82" height="120" rx="4" fill="#e2685f" opacity="0.86"/><text x="383.0" y="103.0" font-size="9.5" font-weight="800" fill="#fff" text-anchor="middle">通信线缆</text><text x="383.0" y="117.0" font-size="8.5" fill="#fff" opacity=".9" text-anchor="middle">+55亿</text><rect x="16" y="168" width="96" height="58" rx="4" fill="#e2685f" opacity="0.86"/><text x="64.0" y="196.0" font-size="11" font-weight="800" fill="#fff" text-anchor="middle">网络设备</text><text x="64.0" y="210.0" font-size="10" fill="#fff" opacity=".9" text-anchor="middle">+48亿</text><rect x="116" y="168" width="60" height="58" rx="4" fill="#e2685f" opacity="0.86"/><text x="146.0" y="196.0" font-size="9.5" font-weight="800" fill="#fff" text-anchor="middle">通信服务</text><text x="146.0" y="210.0" font-size="8.5" fill="#fff" opacity=".9" text-anchor="middle">+20亿</text><rect x="180" y="168" width="52" height="58" rx="4" fill="#e2685f" opacity="0.86"/><text x="206.0" y="196.0" font-size="9.5" font-weight="800" fill="#fff" text-anchor="middle">稀土</text><text x="206.0" y="210.0" font-size="8.5" fill="#fff" opacity=".9" text-anchor="middle">+15亿</text><rect x="236" y="168" width="102" height="58" rx="4" fill="#3f9e77" opacity="0.86"/><text x="287.0" y="196.0" font-size="11" font-weight="800" fill="#fff" text-anchor="middle">板块 X</text><text x="287.0" y="210.0" font-size="10" fill="#fff" opacity=".9" text-anchor="middle">-96亿</text><rect x="342" y="168" width="82" height="58" rx="4" fill="#3f9e77" opacity="0.86"/><text x="383.0" y="196.0" font-size="9.5" font-weight="800" fill="#fff" text-anchor="middle">板块 Y</text><text x="383.0" y="210.0" font-size="8.5" fill="#fff" opacity=".9" text-anchor="middle">-71亿</text><rect x="16" y="230" width="92" height="52" rx="4" fill="#3f9e77" opacity="0.86"/><text x="62.0" y="255.0" font-size="11" font-weight="800" fill="#fff" text-anchor="middle">板块 Z</text><text x="62.0" y="269.0" font-size="10" fill="#fff" opacity=".9" text-anchor="middle">-59亿</text><rect x="112" y="230" width="78" height="52" rx="4" fill="#3f9e77" opacity="0.86"/><text x="151.0" y="255.0" font-size="9.5" font-weight="800" fill="#fff" text-anchor="middle">板块 W</text><text x="151.0" y="269.0" font-size="8.5" fill="#fff" opacity=".9" text-anchor="middle">-44亿</text><rect x="194" y="230" width="68" height="52" rx="4" fill="#3f9e77" opacity="0.86"/><text x="228.0" y="255.0" font-size="9.5" font-weight="800" fill="#fff" text-anchor="middle">板块 V</text><text x="228.0" y="269.0" font-size="8.5" fill="#fff" opacity=".9" text-anchor="middle">-32亿</text><rect x="266" y="230" width="60" height="52" rx="4" fill="#3f9e77" opacity="0.86"/><text x="296.0" y="255.0" font-size="9.5" font-weight="800" fill="#fff" text-anchor="middle">板块 U</text><text x="296.0" y="269.0" font-size="8.5" fill="#fff" opacity=".9" text-anchor="middle">-23亿</text><rect x="330" y="230" width="94" height="52" rx="4" fill="#c9d6e0" opacity="0.5"/><text x="377.0" y="255.0" font-size="11" font-weight="800" fill="#fff" text-anchor="middle">其余 484 个</text><text x="220" y="294" font-size="9.5" fill="#93a3b3" text-anchor="middle">一屏看全 496 个板块的相对体量，但小板块挤成碎块、读数困难</text></svg>
+        <ul>
+          <li><b>优点：</b>全局分布感最强，能看出「今天是普涨还是单点行情」</li>
+          <li><b>缺点：</b>长尾板块挤成碎块，<b>读不出数值</b>，只能看颜色</li>
+          <li><b>缺点：</b>treemap 布局算法要自己写或引库，成本最高</li>
+        </ul>
+      </div>
+      <div class="vcard">
+        <div class="vh"><span class="no">C</span>分时曲线对比</div>
+        <div class="vs">选 3–5 个板块，叠加当日累计净流入曲线，看资金什么时候进的。</div>
+        <svg viewBox="0 0 440 300" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><rect x=".5" y=".5" width="439" height="299" rx="10" fill="#fff" stroke="#e4edf4"/><text x="16" y="24" font-size="12.5" font-weight="800" fill="#22303f">板块分时资金流 · 对比</text><text x="424" y="24" font-size="10.5" fill="#93a3b3" text-anchor="end">当日累计 · 分钟级</text><line x1="16" y1="34" x2="424" y2="34" stroke="#e4edf4"/><rect x="20" y="42" width="9" height="9" rx="2" fill="#e2685f"/><text x="34" y="51" font-size="10.5" fill="#54687c">通信</text><rect x="112" y="42" width="9" height="9" rx="2" fill="#eb8f88"/><text x="126" y="51" font-size="10.5" fill="#54687c">通信设备</text><rect x="204" y="42" width="9" height="9" rx="2" fill="#e9a23b"/><text x="218" y="51" font-size="10.5" fill="#54687c">稀土</text><line x1="44" y1="232" x2="412" y2="232" stroke="#e4edf4"/><text x="38" y="235" font-size="9" fill="#93a3b3" text-anchor="end">-11</text><line x1="44" y1="176" x2="412" y2="176" stroke="#e4edf4"/><text x="38" y="179" font-size="9" fill="#93a3b3" text-anchor="end">44</text><line x1="44" y1="120" x2="412" y2="120" stroke="#e4edf4"/><text x="38" y="123" font-size="9" fill="#93a3b3" text-anchor="end">98</text><line x1="44" y1="64" x2="412" y2="64" stroke="#e4edf4"/><text x="38" y="67" font-size="9" fill="#93a3b3" text-anchor="end">153</text><polyline points="44,222 46,224 47,226 49,227 50,226 52,225 53,225 55,223 56,222 58,221 59,220 61,219 62,220 64,220 66,219 67,220 69,220 70,220 72,221 73,221 75,222 76,223 78,224 79,224 81,224 82,226 84,227 86,227 87,227 89,227 90,227 92,227 93,226 95,225 96,224 98,224 99,224 101,223 103,223 104,223 106,223 107,224 109,225 110,225 112,225 113,225 115,224 116,223 118,222 119,222 121,221 123,219 124,215 126,214 127,213 129,211 130,209 132,207 133,203 135,202 136,200 138,197 139,196 141,194 143,193 144,190 146,188 147,185 149,183 150,181 152,179 153,175 155,174 156,173 158,172 159,171 161,171 163,170 164,170 166,170 167,169 169,169 170,168 172,168 173,168 175,168 176,168 178,168 179,168 181,167 183,167 184,167 186,167 187,167 189,168 190,168 192,168 193,168 195,168 196,169 198,169 200,169 201,170 203,170 204,170 206,170 207,170 209,170 210,169 212,169 213,168 215,167 216,167 218,166 220,166 221,166 223,166 224,166 226,166 227,166 229,163 230,162 232,161 233,161 235,161 236,161 238,161 240,161 241,161 243,161 244,161 246,161 247,162 249,162 250,162 252,162 253,162 255,162 256,162 258,162 260,162 261,163 263,163 264,163 266,163 267,164 269,164 270,164 272,163 273,163 275,162 277,162 278,160 280,159 281,159 283,158 284,157 286,154 287,152 289,151 290,149 292,148 293,146 295,145 297,142 298,140 300,140 301,139 303,138 304,138 306,137 307,137 309,135 310,133 312,133 313,131 315,129 317,129 318,128 320,119 321,118 323,117 324,117 326,117 327,117 329,117 330,116 332,115 333,114 335,114 337,114 338,114 340,114 341,113 343,112 344,112 346,111 347,110 349,110 350,109 352,108 353,108 355,107 357,107 358,107 360,106 361,105 363,105 364,103 366,103 367,102 369,101 370,101 372,101 374,101 375,100 377,100 378,100 380,99 381,99 383,99 384,98 386,98 387,98 389,97 390,97 392,97 394,96 395,95 397,90 398,89 400,87 401,85 403,83 404,82 406,80 407,78 409,78 410,78 412,78" fill="none" stroke="#e2685f" stroke-width="2"/><polyline points="44,222 46,224 47,225 49,226 50,225 52,225 53,224 55,223 56,222 58,221 59,220 61,219 62,220 64,220 66,219 67,220 69,220 70,221 72,221 73,221 75,222 76,222 78,223 79,224 81,224 82,225 84,226 86,226 87,227 89,226 90,226 92,226 93,225 95,224 96,224 98,223 99,223 101,223 103,223 104,223 106,223 107,223 109,224 110,224 112,224 113,224 115,224 116,223 118,222 119,222 121,221 123,219 124,216 126,215 127,214 129,212 130,211 132,209 133,206 135,205 136,203 138,201 139,199 141,198 143,197 144,194 146,192 147,190 149,189 150,186 152,185 153,182 155,181 156,180 158,179 159,178 161,178 163,178 164,178 166,177 167,177 169,176 170,176 172,176 173,176 175,176 176,176 178,176 179,176 181,175 183,175 184,175 186,175 187,175 189,175 190,176 192,176 193,176 195,176 196,176 198,177 200,177 201,177 203,177 204,177 206,177 207,177 209,177 210,177 212,177 213,176 215,175 216,175 218,174 220,174 221,174 223,174 224,174 226,174 227,174 229,171 230,170 232,170 233,170 235,170 236,170 238,170 240,170 241,170 243,170 244,170 246,170 247,170 249,170 250,170 252,170 253,170 255,170 256,171 258,171 260,171 261,171 263,171 264,172 266,172 267,172 269,172 270,172 272,172 273,171 275,171 277,170 278,169 280,168 281,168 283,167 284,166 286,164 287,163 289,162 290,160 292,159 293,157 295,156 297,154 298,152 300,152 301,151 303,150 304,150 306,150 307,149 309,147 310,146 312,146 313,145 315,143 317,143 318,142 320,134 321,133 323,132 324,132 326,132 327,132 329,132 330,131 332,131 333,130 335,130 337,130 338,129 340,129 341,129 343,128 344,128 346,127 347,126 349,126 350,125 352,125 353,124 355,124 357,124 358,123 360,123 361,122 363,122 364,121 366,120 367,119 369,119 370,118 372,118 374,118 375,118 377,118 378,117 380,117 381,117 383,117 384,116 386,116 387,116 389,115 390,115 392,115 394,114 395,113 397,109 398,108 400,107 401,105 403,104 404,102 406,101 407,99 409,99 410,99 412,99" fill="none" stroke="#eb8f88" stroke-width="1.6"/><polyline points="44,221 46,221 47,222 49,222 50,222 52,222 53,222 55,221 56,221 58,221 59,221 61,221 62,221 64,221 66,221 67,221 69,221 70,221 72,221 73,221 75,221 76,221 78,221 79,221 81,221 82,222 84,222 86,222 87,222 89,222 90,222 92,222 93,222 95,222 96,222 98,221 99,221 101,221 103,221 104,221 106,221 107,221 109,222 110,222 112,222 113,222 115,221 116,221 118,221 119,221 121,221 123,221 124,220 126,220 127,220 129,220 130,220 132,220 133,219 135,219 136,219 138,219 139,218 141,218 143,218 144,218 146,218 147,217 149,217 150,217 152,217 153,216 155,216 156,216 158,216 159,216 161,216 163,216 164,216 166,216 167,216 169,216 170,215 172,215 173,215 175,215 176,215 178,215 179,215 181,215 183,215 184,215 186,215 187,215 189,215 190,215 192,215 193,215 195,215 196,216 198,216 200,216 201,216 203,216 204,216 206,216 207,216 209,216 210,216 212,216 213,215 215,215 216,215 218,215 220,215 221,215 223,215 224,215 226,215 227,215 229,215 230,215 232,215 233,215 235,215 236,215 238,215 240,215 241,215 243,215 244,215 246,215 247,215 249,215 250,215 252,215 253,215 255,215 256,215 258,215 260,215 261,215 263,215 264,215 266,215 267,215 269,215 270,215 272,215 273,215 275,215 277,215 278,215 280,215 281,214 283,214 284,214 286,214 287,214 289,214 290,213 292,213 293,213 295,213 297,213 298,213 300,212 301,212 303,212 304,212 306,212 307,212 309,212 310,212 312,212 313,212 315,211 317,211 318,211 320,210 321,210 323,210 324,210 326,210 327,210 329,210 330,210 332,210 333,210 335,210 337,210 338,210 340,210 341,210 343,210 344,209 346,209 347,209 349,209 350,209 352,209 353,209 355,209 357,209 358,209 360,209 361,209 363,209 364,209 366,208 367,208 369,208 370,208 372,208 374,208 375,208 377,208 378,208 380,208 381,208 383,208 384,208 386,208 387,208 389,208 390,208 392,208 394,208 395,208 397,207 398,207 400,207 401,207 403,206 404,206 406,206 407,206 409,206 410,206 412,206" fill="none" stroke="#e9a23b" stroke-width="1.6"/><line x1="44" y1="221" x2="412" y2="221" stroke="#54687c" stroke-width="1.2"/><line x1="227" y1="64" x2="227" y2="232" stroke="#e9a23b" stroke-width="1.3" stroke-dasharray="4 3"/><text x="227" y="245" font-size="9" fill="#a8720f" text-anchor="middle">11:30</text><text x="44" y="245" font-size="9" fill="#93a3b3" text-anchor="middle">09:31</text><text x="412" y="245" font-size="9" fill="#93a3b3" text-anchor="middle">15:00</text><text x="220" y="266" font-size="9.5" fill="#93a3b3" text-anchor="middle">看得出「什么时候被买」，但一次只能比 3–5 个板块</text><text x="220" y="284" font-size="9" fill="#93a3b3" text-anchor="middle">（后两条曲线按实测收盘比例缩放示意 —— 抓取被封前只取到通信板块的分时）</text></svg>
+        <ul>
+          <li><b>优点：</b>唯一能回答「是尾盘拉的还是全天稳买」的形态</li>
+          <li><b>缺点：</b>需要先知道看哪几个板块，<b>不适合当首屏</b></li>
+          <li><b>结论：</b>更适合作为 A 的下钻页，而不是并列的首屏选项</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="dc">
+      <div class="dc-hd"><span class="dc-id">Q1</span><span class="dc-state">已定</span></div>
+      <div class="dc-q">首屏用哪个形态？</div>
+      <div class="dc-a">→ A 双向排行榜（默认）+ B 热力图（可切换）。B 手写 treemap，不引 ECharts。</div>
+<div class="usr"><span class="who">你的补充</span>「都要行吗？」</div>      <div class="dc-why">你选了 A 并问「都要行吗」—— <b>可以，而且代价比 Q1 原选项里写的「+2.5 天」小</b>。当时那个报价是按「引 ECharts 拿现成 treemap」估的。但实测 ECharts 完整版 <b>1095 KB min / 360 KB gzip</b>，为一个视图把静态资源翻倍不划算，而 uPlot 和 Lightweight Charts <b>都不提供 treemap</b>。出路是自己写：squarified treemap 是成熟算法，约 60 行 JS；反正首屏排行榜的 SVG 本来就要手写，两者共用同一套渲染代码。<b>最终形态：首屏默认 A，右上角切「热力」进 B，点任一板块下钻到分时曲线（原 C）。</b>前端因此 <b>+1 天</b>（不是 +1.5 天）。</div>
+    </div>
+
+    <div class="amber">
+      <div class="rt"><span class="tag">强制项</span>无论选哪个，术语提示都必须做</div>
+      <p>根据第二节的结论，图表标题旁必须有一个可点开的「?」，写清楚：
+      <b>这是按成交单笔金额分档统计出来的指标，不代表真有这么多钱进出；只能用于板块间横向比较和趋势观察。</b>
+      这一条不是可选项 —— 缺了它，这个图就是在误导。</p>
+    </div>
+  </section>
+
+  <!-- ════════ 六、更新频率 + Q2 ════════ -->
+  <section>
+    <h2 class="sec">六、多久更新一次（直接回答「实时/半天」）</h2>
+    <p class="note">先把一个容易搞错的前提摆正：<b>分时曲线的细腻程度和抓取频率无关</b> ——
+    收盘后抓 1 次，就能拿到全天 240 个分钟点。抓取频率只影响<b>「盘中你能多快看到当前值」</b>。</p>
+
+    <div class="scrollx"><table>
+      <tr><th style="width:9%">方案</th><th style="width:20%">抓取时点</th><th style="width:11%">日请求量</th><th style="width:13%">限流风险</th><th>你能看到什么</th></tr>
+      <tr><td><b>A 收盘一次</b></td><td>19:00 × 1</td><td>1–2 次</td><td class="ok">几乎为零</td>
+          <td>昨日榜单 + 完整分时曲线。盘中打开看到的是<b>昨天</b>的数据</td></tr>
+      <tr><td><b>B 半日两次</b></td><td>11:35、15:05、19:00</td><td>3–4 次</td><td class="ok">几乎为零</td>
+          <td>上午收盘后能看到上午的（但只占全天 39%）；下午收盘后看全天</td></tr>
+      <tr><td><b>C 盘中低频</b></td><td>09:45–15:00 每 30 分钟 + 19:00</td><td>约 13 次</td><td class="ok">极低</td>
+          <td><b>盘中最多滞后 30 分钟</b>的榜单；点开板块时按需取实时分时曲线</td></tr>
+      <tr><td><b>D 准实时</b></td><td>盘中每 1 分钟</td><td>约 240 次</td><td class="no">中等偏高</td>
+          <td>滞后 &lt;1 分钟。但 240 次/天已接近项目记录里「200 个请求被限流」的量级，<b>不建议</b></td></tr>
+    </table></div>
+
+    <div class="card">
+      <p style="margin-top:0"><b>一个必须注意的时点问题：</b>实测 8-14 的数据时间戳是 <code>15:39:31</code> ——
+      收盘 40 分钟后东财还在更新。所以<b>「收盘后落库」不能定在 15:05，至少要 16:30 之后</b>，
+      否则存进库的是尚未结算完的中间值。建议定 <b>19:00</b>，留足冗余。</p>
+      <p style="margin-bottom:0"><b>关于「实时」：</b>东财自己的页面刷新间隔在 3–5 秒量级，数据源确实是准实时的。
+      但把它接进一个本地工具，真正的限制是限流额度，不是数据本身。方案 C 的 30 分钟滞后，
+      对「今天哪个板块被买」这个问题来说<b>信息损失极小</b>，而风险几乎归零 —— 这是我推荐 C 的原因。</p>
+    </div>
+
+    <div class="dc">
+      <div class="dc-hd"><span class="dc-id">Q2</span><span class="dc-state">已定</span></div>
+      <div class="dc-q">盘中多久抓一次？</div>
+      <div class="dc-a">→ C — 盘中每 30 分钟 + 19:00 落库。</div>
+      <div class="dc-why">两个落地细节：① <b>收盘那次不能定在 15:05</b>。实测 8-14 的数据时间戳是 <code>15:39:31</code>，收盘 40 分钟后东财还在更新，定早了会把未结算完的中间值写进库，所以固定 19:00。② 盘中 cron 要带<b>交易日判断</b>，不能只写 <code>*/30 9-15 * * 1-5</code> —— 节假日空跑虽然无害，但会白白往限流额度上撞。起始时间定 09:45（开盘前 15 分钟数据噪音大，且集合竞价未计入）。</div>
+    </div>
+  </section>
+
+  <!-- ════════ 七、范围 + Q3 ════════ -->
+  <section>
+    <h2 class="sec">七、抓哪些板块</h2>
+    <div class="card">
+      <p style="margin-top:0">三类板块字段完全一致，抓取成本也一样（各 1 个请求）。差别在<b>信息质量</b>：</p>
+      <p><b>行业板块（496 个）</b> — 申万式分类，一只股票只属于一个行业。互斥、可加总、口径干净。
+      但实测发现<b>层级混在一起</b>：「通信」「通信设备」「通信线缆及配套」同时出现在榜上，
+      父子板块的资金会重复计算 —— 榜单前四名其实是同一件事。<b>需要做层级去重，否则榜单会被一个热点刷屏</b>（E2 那张图就是活例子）。</p>
+      <p><b>概念板块（504 个）</b> — 「5G 概念」「人工智能」这类。一只股票可属于多个概念，<b>严重重叠、不可加总</b>，
+      但对普通用户更有解释力（「今天钱在往 AI 跑」比「往通信设备跑」好懂）。噪音也更大，蹭热点的概念板块很多。</p>
+      <p style="margin-bottom:0"><b>地域板块（31 个）</b> — 「江苏板块」这种，对基金决策基本没用。<b>建议直接不做</b>。</p>
+    </div>
+
+    <div class="dc">
+      <div class="dc-hd"><span class="dc-id">Q3</span><span class="dc-state">已定</span></div>
+      <div class="dc-q">抓行业板块、概念板块，还是都要？</div>
+      <div class="dc-a">→ 行业 + 概念，首屏 Tab 切换。</div>
+      <div class="dc-why">抓取成本只多 1 个请求；落库量翻倍到 <b>1000 行/交易日</b>（约 25 MB/年，仍然很小）。<b>必须配套做层级去重</b>：实测 8-14 的榜单前四名是「通信 / 通信设备 / 通信线缆及配套 / 通信网络设备及器件」，父子板块资金重复计算，等于一个热点把榜刷屏了（第三节 E2 那张图就是活例子）。去重规则：同一父级下只保留净额最大的一个子板块，父板块单独成行并标注「含 N 个子板块」。</div>
+    </div>
+  </section>
+
+  <!-- ════════ 八、落库 + Q4 ════════ -->
+  <section>
+    <h2 class="sec">八、要不要落库（架构变更，Gate 要求明确确认）</h2>
+
+    <div class="amber">
+      <div class="rt"><span class="tag">架构变更</span>现有 market 包是「不落库」的，这次要破例</div>
+      <p><code>internal/market/board.go</code> 开头的设计注释写得很清楚：
+      <b>「不落库：行情是易失数据，没有历史图表需求，缓存放进程内存」</b>。
+      资金流功能<b>正好有历史图表需求</b>（E4 那张 120 天的图），所以要么破这个例，要么放弃历史视图。
+      按全局规范，架构变更必须在文档里点明并被你确认 —— 这就是本节存在的原因。</p>
+    </div>
+
+    <div class="card">
+      <p style="margin-top:0"><b>存储量实测估算：</b></p>
+      <p>· <b>日线</b>：496 行业 + 504 概念 = 1000 行/交易日 × 约 250 日 ≈ <b>25 万行/年</b>，
+      每行约 100 字节（代码/名称/五档净额/五档占比/收盘/涨跌）→ 约 <b>25 MB/年</b>。SQLite 完全扛得住。<br>
+      · <b>分时</b>：1000 板块 × 240 点 × 250 日 ≈ <b>6000 万行/年</b> → 约 <b>2.4 GB/年</b>。
+      <b>不能全存</b>，而且没必要 —— 东财当日现取只要 60ms。</p>
+      <p style="margin-bottom:0"><b>所以分时的真正取舍是：</b>东财只提供<b>当日</b>分时，收盘后就查不到昨天的分钟曲线了。
+      想要「回看上周三那天资金什么时候进的」，就必须每天收盘后把当天的分时存下来。
+      折中方案是<b>只存当日榜单 Top20 板块的分时</b> → 20 × 240 × 250 ≈ 120 万行/年 ≈ 50 MB/年。</p>
+    </div>
+
+    <div class="dc">
+      <div class="dc-hd"><span class="dc-id">Q4</span><span class="dc-state">已定</span></div>
+      <div class="dc-q">历史数据存到什么程度？</div>
+      <div class="dc-a">→ 存日线（全量）+ 每日榜单 Top20 板块的分时。约 75 MB/年。</div>
+      <div class="dc-why"><b>这条确认了架构变更</b>：新增 <code>sector_fund_flow_daily</code> 与 <code>sector_fund_flow_minute</code> 两张表，走 <code>migrations/005_*.sql</code>，<b>正式打破 <code>internal/market/board.go</code> 开头写的「不落库」原则</b>。该注释需要同步更新，说明「资金流是例外，因为它有历史图表需求」，否则下一个读代码的人会以为这是违规实现。另外建议加一条清理策略（保留 3 年），避免多年后数据库无声膨胀。</div>
+    </div>
+  </section>
+
+  <!-- ════════ 九、集成方案 + Q5 ════════ -->
+  <section>
+    <h2 class="sec">九、怎么接进现有代码</h2>
+
+    <div class="flow">
+<pre style="margin:0;font-family:'SF Mono',Menlo,monospace;font-size:12px;line-height:1.95;color:#54687c">
+┌─ 抓取层 ────────────────────────────────────────────────────────────┐
+│  <b style="color:#2f7d58">新增</b> internal/fetcher/fundflow.go                                   │
+│     复用现成的 client.go：getWithReferer() + 3 次重试 + workerPool   │
+│     └ FetchSectorFlow(kind)   1 请求 → 496/504 个板块               │
+│     └ FetchSectorMinute(bk)   1 请求 → 当日 240 个分钟点            │
+│     └ FetchSectorDaily(bk)    1 请求 → 近 120 个交易日              │
+│     <b style="color:#b4453c">改动</b> client.go：失败改指数退避，不再固定 1 秒（红线 1）           │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           ▼
+┌─ 存储层 ────────────────────────────────────────────────────────────┐
+│  <b style="color:#2f7d58">新增</b> migrations/005_sector_fund_flow.sql        ← <b style="color:#a8720f">架构变更，见 Q4</b>  │
+│     sector_fund_flow_daily(date, bk_code, kind, name,               │
+│       main_net, xl_net, lg_net, md_net, sm_net,  五档净额           │
+│       main_pct …, close, chg_pct)   PK(date, bk_code)               │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           ▼
+┌─ 调度层 ────────────────────────────────────────────────────────────┐
+│  <b style="color:#b4453c">改动</b> internal/scheduler/scheduler.go（现有 8 个任务 → 10 个）      │
+│     +9  盘中每 30 分钟刷新榜单（仅交易日 09:45–15:00）  ← <b style="color:#a8720f">见 Q2</b>      │
+│     +10 每日 19:00 落库当日日线（收盘 40 分钟后数据才稳）          │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           ▼
+┌─ 接口层 ────────────────────────────────────────────────────────────┐
+│  <b style="color:#2f7d58">新增</b> internal/handler/fundflow.go + routes.go 挂 3 条路由         │
+│     GET /api/fundflow/rank?kind=industry    榜单（内存缓存兜底）    │
+│     GET /api/fundflow/minute?bk=BK1215      分时曲线（按需）        │
+│     GET /api/fundflow/daily?bk=BK1215&n=120 历史（先查库，缺则回源）│
+└──────────────────────────┬──────────────────────────────────────────┘
+                           ▼
+┌─ 前端 ──────────────────────────────────────────────────────────────┐
+│  <b style="color:#2f7d58">新增</b> static/js/fundflow.js + 一个 Tab                             │
+│     图表实现方式 ← <b style="color:#a8720f">见 Q5</b>                                          │
+│  <b style="color:#b4453c">必做</b> 术语提示「?」：说清这不是真实资金进出（第二节强制项）        │
+└─────────────────────────────────────────────────────────────────────┘
+</pre>
+    </div>
+
+    <h3 class="sub">图表怎么画 —— 关系到二进制体积</h3>
+    <div class="card">
+      <p style="margin-top:0"><b>更正：项目其实已经有图表库了。</b>我最初写这份稿时说「没有任何图表库」，
+      是看漏了 —— <code>static/index.html</code> 第 9 行从 jsDelivr 载入了 <b>ECharts 5</b>，
+      <code>static/js/app.js</code> 的 <code>initChart()</code> 一直在用它（还带了 ResizeObserver 处理容器变宽）。
+      下面 Q5 的结论已按正确前提重判。</p>
+      <p><code>embed.go</code> 把整个 <code>static/</code> 打进单个可执行文件 —— 这是「双击即用」的实现方式。
+      但 ECharts <b>不在</b> <code>static/</code> 里，走的是 CDN。</p>
+      <p style="margin-bottom:0"><b>由此暴露一个既有问题：</b>断网时 ECharts 载不进来，
+      <b>全站图表都画不出来</b>，与 README「首启无需联网」的承诺冲突。
+      要修就把 ECharts 下载进 <code>static/</code>（约 +1 MB），这是独立于本功能的一笔改动，等你定。</p>
+    </div>
+
+    <div class="dc">
+      <div class="dc-hd"><span class="dc-id">Q5</span><span class="dc-state">已定（前提修正后重判）</span></div>
+      <div class="dc-q">图表用手写 SVG 还是引库？</div>
+      <div class="dc-a">→ 用项目里<b>已有的 ECharts</b>。榜单条形仍手写 HTML/CSS。</div>
+      <div class="usr"><span class="who">你的补充</span>「金融行业那个库最好就用那个」</div>
+      <div class="dc-why"><b>这题我之前给错了前提，结论作废重来。</b>
+      我当时说「项目现在没有任何图表库」，据此建议引 TradingView Lightweight Charts。
+      实际情况是：<code>static/index.html</code> 第 9 行早就从 CDN 载入了 <b>ECharts 5</b>，
+      <code>static/js/app.js</code> 的 <code>initChart()</code> 一直在用。是我看漏了 grep 结果。
+      <br><br>前提修正后结论跟着变：ECharts 已经在了，<b>热力图要的 treemap 现成</b>，边际成本为零；
+      再引 Lightweight Charts 等于为两张时序图多背一个 60 KB gzip 的库，
+      而它<b>画不了</b>首屏的排行榜和热力图（那两块无论选谁都得手写）。所以改用 ECharts。
+      <br><br>已落地的两个取舍：① <b>榜单条形不进图表库</b> —— 它要展开/折叠被合并的板块、要点击下钻，
+      用 HTML+CSS 画条更好控制；② <b>分时曲线用 category 轴而不是时间轴</b> ——
+      A 股有 11:30–13:00 午休，时间轴会画出一段平坦空档，看起来像「这段时间没成交」。
+      <br><br><b>顺带发现一个既有问题（本次没动）：</b>ECharts 走的是 jsDelivr CDN，
+      <code>static/</code> 里没有本地副本 —— <b>断网时所有图表都画不出来</b>，
+      这和 README「首启无需联网、双击即用」的卖点冲突，本次新增的图表同样受影响。
+      要修就把 ECharts 下载进 <code>static/</code>（二进制约 +1 MB），做不做请你定。</div>
+    </div>
+
+    <h3 class="sub">工作量估算</h3>
+    <div class="scrollx"><table>
+      <tr><th style="width:26%">模块</th><th style="width:13%">人日</th><th>说明</th></tr>
+      <tr><td>fetcher/fundflow.go</td><td>0.5</td><td>3 个抓取函数 + 字段映射 + 退避重试改造。client.go 已有骨架，改动小</td></tr>
+      <tr><td>migration + 落库</td><td>0.6</td><td>2 张表 + upsert + <b>父子板块层级去重</b>（Q3 定了行业+概念，这块必做）</td></tr>
+      <tr><td>handler + 路由</td><td>0.5</td><td>3 条 API + 缓存降级（照抄 market 包现有的 Stale 模式）</td></tr>
+      <tr><td>scheduler</td><td>0.2</td><td>2 个 cron，含交易日判断</td></tr>
+      <tr><td>前端图表</td><td>2.0</td><td>A 排行榜（手写 HTML/CSS）+ B 热力图（ECharts treemap）+ 两个下钻图（ECharts）</td></tr>
+      <tr><td>降级/异常/文案</td><td>0.5</td><td>限流时的兜底、术语提示、空态</td></tr>
+      <tr><td><b>合计</b></td><td><b>约 4.3</b></td><td>不含联调和你的验收往返。比初版高 0.1–1.1，多出来的是 B 热力图</td></tr>
+    </table></div>
+
+    <p class="note"><b>本项目非小程序，不涉及分享设计</b> —— 桌面端 Web，无分享入口需求，故本节不写。</p>
+  </section>
+
+  <!-- ════════ 十、汇总 ════════ -->
+  <section>
+    <h2 class="sec">十、决策汇总与提交</h2>
+    <div class="scrollx"><table class="sumt">
+      <tr><th style="width:7%">题号</th><th style="width:32%">定案</th><th>落地要点</th></tr>
+      <tr><td>Q1</td><td>A 排行榜 + B 热力图切换</td><td>下钻到分时曲线；treemap 直接用 ECharts 现成的（它本来就在）</td></tr>
+      <tr><td>Q2</td><td>盘中每 30 分钟 + 19:00 落库</td><td>约 13 请求/天；收盘那次必须 19:00（实测 15:39 数据仍在变）；cron 带交易日判断</td></tr>
+      <tr><td>Q3</td><td>行业 + 概念，Tab 切换</td><td>1000 行/交易日；<b>必须做父子板块层级去重</b></td></tr>
+      <tr><td>Q4</td><td>日线全量 + Top20 分时</td><td>新增 2 张表，约 75 MB/年；<b>架构变更已确认</b>，需同步改 board.go 的「不落库」注释</td></tr>
+      <tr><td>Q5</td><td><b>改用项目已有的 ECharts</b></td><td>原判断基于「项目没有图表库」，<b>该前提是错的</b>（index.html 早已引入 ECharts 5）。零边际成本且 treemap 现成；榜单仍手写 HTML/CSS。<b>遗留：ECharts 走 CDN，断网时图表全部失效</b></td></tr>
+    </table></div>
+
+    <div class="card" style="margin-top:14px">
+      <div style="font-size:14px;font-weight:800;color:var(--ink);margin-bottom:6px">工作量重估（按以上定案）</div>
+      <div>抓取层 0.5 · 落库+迁移 0.6 · handler 0.5 · scheduler 0.2 · 前端 <b>2.0</b>（A+B+两个下钻图）· 降级与文案 0.5
+      　→ <b>合计约 4.3 人日</b>（比初版 3.2–4.2 略高，多出来的是 B 热力图和手写 treemap）。</div>
+    </div>
+
+    <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.9">
+      开工 Gate：五道决策题全部答完 · 架构变更（新增 <code>sector_fund_flow_daily</code> 表、破 market 包「不落库」原则）已在第八节点明并被确认 ·
+      术语提示文案已敲定 · 抓取节流策略已按红线 1 落进代码。
+    </div>
+  </section>
+
+</div>

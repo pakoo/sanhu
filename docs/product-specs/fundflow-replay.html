@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>资金流：自动刷新 + 一天回放 — 产品稿</title>
+<style>
+:root{
+  /* 主色按功能调；决策卡的琥珀/绿是**语义色，不要改** */
+  --bg:#eef2f6; --panel:#fff;
+  --ink:#22303f; --ink-2:#54687c; --muted:#93a3b3; --line:#e4edf4;
+  --primary:#7cb4de; --primary-deep:#4b89bb; --primary-soft:#eef7ff;
+  --danger:#e2685f;
+  --shadow:0 8px 20px rgba(63,96,127,.10);
+  --shadow-sm:0 3px 10px rgba(63,96,127,.07);
+  --dq-open:#e9a23b; --dq-open-bg:#fffaf0;
+  --dq-done:#52a67c; --dq-done-bg:#f2faf6;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+.doc{max-width:1560px;margin:0 auto;padding:0 26px 90px}
+h1{font-size:25px;font-weight:800;margin:0 0 6px}
+h2.sec{font-size:19px;font-weight:800;margin:38px 0 14px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;scroll-margin-top:76px}
+h2.sec::before{content:"";width:5px;height:19px;border-radius:3px;background:var(--primary-deep)}
+.doc-head{padding:30px 0 6px}
+.doc-head .sub{font-size:13px;color:var(--ink-2);line-height:1.9}
+.pill{display:inline-block;font-size:11.5px;font-weight:800;border-radius:20px;padding:3px 11px;margin-right:7px}
+.pill.draft{background:#fff4e2;color:#a8720f}
+.pill.base{background:var(--primary-soft);color:var(--primary-deep)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 19px;box-shadow:var(--shadow-sm);font-size:13.5px;line-height:1.85;color:var(--ink-2)}
+table{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:10px 0}
+th{background:#f7fafc;text-align:left;padding:9px 12px;font-weight:700;color:var(--ink-2);border-bottom:1px solid var(--line)}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:none}
+code{background:#f1f4f7;border-radius:5px;padding:1px 5px;font-size:12px;font-family:"SF Mono",Menlo,monospace;color:#b8446a}
+.scrollx{overflow-x:auto}
+
+/* ---- 手机框（基准 390px）---- */
+.row{display:flex;gap:26px;flex-wrap:wrap;align-items:flex-start}
+.pcol{flex:0 0 340px;max-width:100%}
+.cap{font-size:13px;font-weight:800;margin-bottom:8px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.cap .no{background:var(--primary-deep);color:#fff;border-radius:7px;padding:2px 8px;font-size:11px;font-weight:800}
+.capsub{font-size:11.5px;color:var(--muted);margin:-3px 0 9px;line-height:1.6}
+.phone{width:340px;height:700px;border-radius:32px;overflow:hidden;position:relative;background:#fff;box-shadow:var(--shadow);border:1px solid var(--line)}
+.phone .nav{height:46px;display:flex;align-items:center;justify-content:center;font-size:14.5px;font-weight:800;border-bottom:1px solid var(--line)}
+.phone .scr{padding:12px;height:calc(100% - 46px);overflow:hidden}
+
+/* ============ 内联决策卡（勿删；细则见 SPEC_GUIDE § 五·B）============ */
+.dqbar{position:sticky;top:0;z-index:200;margin:0 -26px 18px;padding:11px 26px;
+  background:rgba(238,242,246,.94);backdrop-filter:blur(10px);border-bottom:1px solid #d7e3ec;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.dqbar .p-txt{font-size:13px;font-weight:800;white-space:nowrap}
+.dqbar .p-txt em{font-style:normal;color:var(--dq-open)}
+.dqbar .p-txt.all-done em{color:var(--dq-done)}
+.dqbar .p-track{flex:1;min-width:120px;height:8px;border-radius:5px;background:#d3e0ea;overflow:hidden}
+.dqbar .p-fill{height:100%;width:0;border-radius:5px;background:linear-gradient(90deg,#8ecfae,var(--dq-done));transition:width .25s}
+.dqbar button{font-size:12.5px;font-weight:700;padding:7px 15px;border-radius:19px;cursor:pointer;
+  border:1px solid #c6d6e2;background:#fff;color:var(--ink-2);white-space:nowrap}
+.dqbar button:hover{border-color:var(--primary);color:var(--primary-deep)}
+.dqbar button.primary{background:var(--primary-deep);border-color:var(--primary-deep);color:#fff}
+.dqbar button.ghost-danger:hover{border-color:var(--danger);color:var(--danger)}
+
+.dqrail{position:fixed;right:14px;top:50%;transform:translateY(-50%);z-index:190;
+  display:flex;flex-direction:column;gap:8px;background:rgba(255,255,255,.9);backdrop-filter:blur(8px);
+  border:1px solid #dce7ef;border-radius:22px;padding:10px 8px;box-shadow:var(--shadow-sm)}
+.dqrail .rdot{width:26px;height:26px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:10.5px;font-weight:800;background:var(--dq-open-bg);color:var(--dq-open);border:1.5px solid var(--dq-open);transition:.15s}
+.dqrail .rdot:hover{transform:scale(1.12)}
+.dqrail .rdot.done{background:var(--dq-done-bg);color:var(--dq-done);border-color:var(--dq-done)}
+@media(max-width:1180px){.dqrail{display:none}}
+
+.dq{margin:16px 0 6px;border-radius:14px;border:1px solid #f0dcb8;border-left:6px solid var(--dq-open);
+  background:var(--dq-open-bg);padding:15px 18px 16px;scroll-margin-top:78px;box-shadow:var(--shadow-sm)}
+.dq.answered{border-color:#cbe8da;border-left-color:var(--dq-done);background:var(--dq-done-bg)}
+.dq-hd{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:4px}
+.dq-id{background:var(--dq-open);color:#fff;font-size:11.5px;font-weight:800;border-radius:7px;padding:2px 9px}
+.dq.answered .dq-id{background:var(--dq-done)}
+.dq-state{font-size:11px;font-weight:800;border-radius:6px;padding:2px 8px;background:#fff;color:var(--dq-open);border:1px solid #f0dcb8}
+.dq.answered .dq-state{color:var(--dq-done);border-color:#cbe8da}
+.dq:not(.answered) .dq-state{animation:dqPulse 2.2s ease-in-out infinite}
+@keyframes dqPulse{0%,100%{opacity:1}50%{opacity:.45}}
+.dq-q{font-size:14.5px;font-weight:800;line-height:1.6}
+.dq-sub{font-size:12.5px;color:var(--ink-2);line-height:1.8;margin-top:5px}
+.dq-sub code{background:#fff;border:1px solid #e6d9c0}
+.dq-opts{margin-top:11px;display:flex;flex-direction:column;gap:8px}
+.dq-opt{display:flex;align-items:flex-start;gap:10px;cursor:pointer;background:#fff;
+  border:1.5px solid #e8dcc4;border-radius:11px;padding:11px 13px;transition:.15s}
+.dq-opt:hover{border-color:var(--dq-open);box-shadow:0 2px 8px rgba(233,162,59,.13)}
+.dq-opt input{width:17px;height:17px;margin-top:2px;flex:none;accent-color:var(--dq-done);cursor:pointer}
+.dq-opt.sel{border-color:var(--dq-done);background:var(--dq-done-bg)}
+.dq-opt .o-body{flex:1;min-width:0}
+.dq-opt .o-t{font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.dq-opt .o-d{font-size:12px;color:var(--ink-2);line-height:1.75;margin-top:3px}
+.rec-chip{background:var(--primary-soft);color:var(--primary-deep);border:1px solid #cfe6f7;border-radius:5px;font-size:10.5px;font-weight:800;padding:1px 7px;white-space:nowrap}
+.cost-chip{background:#f4f7fa;color:#6c8092;border:1px solid #dde7ef;border-radius:5px;font-size:10.5px;font-weight:700;padding:1px 7px;white-space:nowrap}
+.dq-note{margin-top:10px}
+.dq-note label{display:block;font-size:11.5px;color:var(--muted);font-weight:700;margin-bottom:5px}
+.dq-note textarea{width:100%;min-height:52px;resize:vertical;border:1.5px solid #e8dcc4;border-radius:10px;
+  padding:9px 11px;font-size:13px;font-family:inherit;line-height:1.7;background:#fff}
+.dq-note textarea:focus{outline:none;border-color:var(--dq-open)}
+
+.sec-badge{display:inline-flex;align-items:center;gap:5px;background:var(--dq-open-bg);color:#a8720f;
+  border:1px solid #f0dcb8;border-radius:20px;font-size:11.5px;font-weight:800;padding:3px 11px}
+.sec-badge.done{background:var(--dq-done-bg);color:#2f7d58;border-color:#cbe8da}
+.sec-badge i{width:7px;height:7px;border-radius:50%;background:var(--dq-open);font-style:normal}
+.sec-badge.done i{background:var(--dq-done)}
+
+.dqsum-row{display:flex;align-items:flex-start;gap:12px;padding:11px 13px;border-radius:11px;background:#fff;
+  border:1px solid var(--line);border-left:4px solid var(--dq-open);margin-bottom:9px;cursor:pointer}
+.dqsum-row.done{border-left-color:var(--dq-done)}
+.dqsum-row .s-id{font-size:12px;font-weight:800;color:var(--ink);flex:none;width:34px}
+.dqsum-row .s-q{flex:1;min-width:0;font-size:12.5px;color:var(--ink-2);line-height:1.7}
+.dqsum-row .s-a{flex:none;max-width:46%;font-size:12.5px;font-weight:800;color:var(--dq-done);text-align:right;line-height:1.7}
+.dqsum-row:not(.done) .s-a{color:var(--dq-open)}
+.dqsum-row .s-a .s-note{display:block;font-weight:600;color:var(--ink-2);font-size:11.5px;margin-top:3px}
+.dq-out{width:100%;min-height:130px;resize:vertical;margin-top:12px;border:1.5px solid var(--line);border-radius:12px;
+  padding:12px 14px;font-family:"SF Mono",Menlo,monospace;font-size:12.5px;line-height:1.85;background:#fbfdff}
+.dq-out:focus{outline:none;border-color:var(--primary)}
+.copy-hint{font-size:12px;color:var(--muted);margin-top:9px;line-height:1.8}
+.toast{position:fixed;left:50%;bottom:38px;transform:translateX(-50%) translateY(14px);background:rgba(34,48,63,.94);
+  color:#fff;font-size:13px;font-weight:700;padding:11px 22px;border-radius:24px;z-index:400;opacity:0;pointer-events:none;transition:.22s}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+<style>
+.chart{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px 20px 12px;box-shadow:var(--shadow-sm);margin:10px 0}
+.chart .ct{font-size:13.5px;font-weight:800;color:var(--ink);display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:2px}
+.chart .ct .no{background:var(--primary-deep);color:#fff;border-radius:7px;padding:2px 8px;font-size:11px}
+.chart .cs{font-size:12px;color:var(--muted);line-height:1.7;margin:2px 0 10px}
+.real{background:#eef7f2;color:#2f7d58;border:1px solid #cbe8da;border-radius:5px;font-size:10.5px;font-weight:800;padding:1px 7px}
+.verdict{display:flex;gap:16px;align-items:flex-start;background:linear-gradient(135deg,#f2faf6,#eef7ff);
+  border:1px solid #cbe8da;border-left:6px solid var(--dq-done);border-radius:16px;padding:20px 24px;margin:14px 0 6px;box-shadow:var(--shadow-sm)}
+.verdict .vi{font-size:34px;line-height:1;flex:none}
+.verdict h3{margin:0 0 6px;font-size:18px;font-weight:800;color:var(--ink)}
+.verdict p{margin:0 0 8px;font-size:13.5px;line-height:1.9;color:var(--ink-2)}
+.verdict p:last-child{margin-bottom:0}
+.red{background:#fef5f4;border:1px solid #f3d4d1;border-left:6px solid var(--danger);border-radius:14px;padding:15px 19px;margin:12px 0}
+.red .rt{font-size:14px;font-weight:800;color:#b4453c;display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.red .rt .tag{background:var(--danger);color:#fff;border-radius:6px;font-size:11px;padding:2px 8px}
+.red p{margin:5px 0;font-size:13px;line-height:1.85;color:var(--ink-2)}
+.amber{background:#fffaf0;border:1px solid #f0dcb8;border-left:6px solid var(--dq-open);border-radius:14px;padding:15px 19px;margin:12px 0}
+.amber .rt{font-size:14px;font-weight:800;color:#a8720f;display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.amber .rt .tag{background:var(--dq-open);color:#fff;border-radius:6px;font-size:11px;padding:2px 8px}
+.amber p{margin:5px 0;font-size:13px;line-height:1.85;color:var(--ink-2)}
+.ok{color:#2f7d58;font-weight:800} .no{color:#b4453c;font-weight:800} .warn{color:#a8720f;font-weight:800}
+pre.log{background:#1e2a36;color:#c8d6e2;border-radius:11px;padding:14px 17px;font-family:"SF Mono",Menlo,monospace;
+  font-size:11.5px;line-height:1.75;overflow-x:auto;margin:10px 0}
+pre.log b{color:#ffb454;font-weight:700} pre.log i{color:#7fd1a8;font-style:normal}
+.kpis{display:flex;gap:13px;flex-wrap:wrap;margin:12px 0}
+.kpi{flex:1;min-width:158px;background:#fff;border:1px solid var(--line);border-radius:13px;padding:13px 16px;box-shadow:var(--shadow-sm)}
+.kpi .k{font-size:11px;color:var(--muted);font-weight:700;line-height:1.5}
+.kpi .v{font-size:21px;font-weight:800;color:var(--ink);margin:4px 0 1px;letter-spacing:-.5px}
+.kpi .n{font-size:11px;color:var(--ink-2);line-height:1.6}
+.frames{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin:10px 0}
+.fr{background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 12px;box-shadow:var(--shadow-sm)}
+.fr .fh{font-size:11.5px;font-weight:800;color:var(--ink-2);margin-bottom:7px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:18px;margin:12px 0}
+.vcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px 17px;box-shadow:var(--shadow-sm)}
+.vcard .vh{font-size:13.5px;font-weight:800;color:var(--ink);display:flex;align-items:center;gap:8px;margin-bottom:3px}
+.vcard .vh .no{background:var(--primary-deep);color:#fff;border-radius:7px;padding:2px 8px;font-size:11px}
+.vcard .vs{font-size:11.5px;color:var(--muted);line-height:1.7;margin-bottom:9px}
+.vcard ul{margin:9px 0 0;padding-left:17px;font-size:12px;color:var(--ink-2);line-height:1.85}
+.note{font-size:12px;color:var(--muted);line-height:1.85;margin:8px 0}
+h3.sub{font-size:15px;font-weight:800;margin:22px 0 8px;color:var(--ink)}
+td .ok,td .no,td .warn{white-space:nowrap}
+</style>
+</head>
+
+<body>
+<div class="doc">
+
+  <div class="dqbar">
+    <span class="p-txt" id="pTxt">0 / 0 已决策</span>
+    <div class="p-track"><div class="p-fill" id="pFill"></div></div>
+    <button id="btnNext">跳到下一个待决策 ↓</button>
+    <button class="primary" id="btnCopyTop">复制答案给 Claude</button>
+    <button class="ghost-danger" id="btnReset">清空</button>
+  </div>
+  <div class="dqrail" id="dqRail"></div>
+
+  <div class="doc-head">
+    <h1>资金流：自动刷新 + 一天回放 — 产品稿</h1>
+    <div class="sub">
+      <span class="pill draft">待确认</span><span class="pill base">sanhu · 桌面端 Web · 2026-08-16</span><br>
+      承接已上线的「资金流」Tab（<a href="sector-fund-flow.html">sector-fund-flow.html</a>）。
+      本稿里的所有帧都用 <b>2026-08-14 的真实分时数据</b>画（5 个板块 × 240 个分钟点），不是示意图。
+    </div>
+  </div>
+
+  <!-- ═══ 一、先回答问题 ═══ -->
+  <section>
+    <h2 class="sec">一、先回答你的问题</h2>
+
+    <div class="verdict">
+      <div class="vi">✅</div>
+      <div>
+        <h3>现在是纯手动。自动刷新能做，回放也能做 —— 但各有一个前置条件。</h3>
+        <p><b>现状：</b>前端<b>完全不自动刷新</b> —— 只有切到 Tab 时懒加载一次，之后要看新数据只能点「刷新」。
+        但<b>后端其实一直在动</b>：调度器在交易时段每 30 分钟抓一次并落库。
+        也就是说数据是新的，只是页面不知道。</p>
+        <p><b>自动刷新的前置条件：</b>后端 <code>BuildBoard</code> 目前<b>每次 API 调用都回源打东财</b>，没有 TTL 缓存。
+        前端要是每 60 秒刷一次，就是每小时 60 个东财请求 —— 正好是限流的成因。
+        <b>必须先补缓存，否则自动刷新等于给自己挖坑</b>（见第二节）。</p>
+        <p><b>回放的前置条件：</b>回放能覆盖多少板块，完全取决于<b>存了多少板块的分时</b>。
+        现在只存 Top20，而且这个数字不是随便定的 —— 每多存一个板块就多一个东财请求（见第四节）。</p>
+      </div>
+    </div>
+
+    <div class="kpis">
+      <div class="kpi"><div class="k">前端刷新方式</div><div class="v">纯手动</div><div class="n">切 Tab 懒加载 + 刷新按钮，无轮询</div></div>
+      <div class="kpi"><div class="k">后端已在做</div><div class="v">30 分钟</div><div class="n">交易时段自动抓取并落库（任务 9）</div></div>
+      <div class="kpi"><div class="k">当前缓存</div><div class="v">无 TTL</div><div class="n">每次 API 调用都回源，自动刷新前必须补</div></div>
+      <div class="kpi"><div class="k">回放数据基础</div><div class="v">Top20</div><div class="n">每日收盘留档 20 个板块 × 240 分钟点</div></div>
+    </div>
+  </section>
+
+  <!-- ═══ 二、必须先修 ═══ -->
+  <section>
+    <h2 class="sec">二、加自动刷新之前，必须先修的一件事</h2>
+
+    <div class="red">
+      <div class="rt"><span class="tag">前置</span>后端没有 TTL 缓存，每次请求都回源</div>
+      <p>现在的 <code>BuildBoard</code> 是这样的：</p>
+      <pre class="log">func BuildBoard(db, kind, dedup) *Board {
+    rows, err := fetchRank(kind)      <b>← 无条件回源，每次 API 调用都真打东财</b>
+    if err == nil { ... return b }
+    // 只有失败时才用缓存
+}</pre>
+      <p>内存缓存<b>只在抓取失败时当兜底</b>，不是「N 分钟内直接复用」。
+      所以「前端每 60 秒自动刷新」在当前实现下 = <b>每小时 60 个东财请求</b>，
+      而项目记录里 200 个请求就会被限流。这是自动刷新方案的硬前置。</p>
+      <p><b>改法：</b>给 <code>BuildBoard</code> 加 TTL —— 缓存在 <b>N 分钟</b>内直接返回，不回源。
+      这样前端爱怎么轮询都行，<b>东财请求量由 TTL 决定，与前端刷新频率彻底解耦</b>。
+      TTL 取多少见 Q1；改动量约 0.2 人日。</p>
+    </div>
+
+    <div class="amber">
+      <div class="rt"><span class="tag">顺带</span>解耦之后，自动刷新几乎零成本</div>
+      <p>加了 TTL 之后，前端轮询打的是<b>本地内存</b>，不产生任何外部请求。
+      所以「多久刷一次页面」和「多久打一次东财」变成两个独立的旋钮：
+      前端可以 30 秒刷一次让界面显得活，而东财那边仍然是 30 分钟一次。</p>
+    </div>
+  </section>
+
+  <!-- ═══ 三、自动刷新方案 + Q1 ═══ -->
+  <section>
+    <h2 class="sec">三、自动刷新怎么做</h2>
+    <div class="scrollx"><table>
+      <tr><th style="width:11%">方案</th><th style="width:19%">前端行为</th><th style="width:15%">后端 TTL</th><th style="width:15%">东财请求量</th><th>体感</th></tr>
+      <tr><td><b>A 保持手动</b></td><td>不轮询</td><td>不需要</td><td class="ok">仅调度器 13 次/天</td>
+          <td>要看新数据得点刷新。<b>符合本项目「每天只看 1–2 次」的既有定位</b></td></tr>
+      <tr><td><b>B 温和轮询</b></td><td>停留在 Tab 时每 <b>60 秒</b>拉一次</td><td>5 分钟</td><td class="ok">≤ 12 次/小时</td>
+          <td>最多滞后 5 分钟，界面自己会更新，不用管它</td></tr>
+      <tr><td><b>C 准实时</b></td><td>每 <b>15 秒</b>拉一次</td><td>1 分钟</td><td class="warn">≤ 60 次/小时</td>
+          <td>滞后 &lt;1 分钟，但东财请求量接近限流量级，<b>收益很低</b> —— 板块资金流不是盯盘用的</td></tr>
+    </table></div>
+
+    <div class="amber">
+      <div class="rt"><span class="tag">必做</span>三个方案都要遵守的规矩</div>
+      <p>① <b>只在交易时段轮询</b>。收盘后数据不再变，继续轮询纯属浪费 —— 用已有的 <code>InTradingSession</code> 判断。<br>
+      ② <b>页面不可见时暂停</b>。用 <code>document.visibilityState</code>，切到别的 Tab 或最小化就停，回来再续。<br>
+      ③ <b>刷新时不能闪</b>。整块 innerHTML 重绘会让用户正在看的行跳掉；要做成只更新数值和条宽。</p>
+    </div>
+
+    <div class="dq" id="Q1" data-q="Q1" data-title="自动刷新方案">
+      <div class="dq-hd"><span class="dq-id">Q1</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">要不要自动刷新？多久一次？</div>
+      <div class="dq-sub">无论选哪个，后端 TTL 缓存都建议补上 —— 它同时也是防「用户狂点刷新把自己打限流」的保险。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q1" value="B 温和轮询：前端 60 秒 + 后端 TTL 5 分钟">
+          <span class="o-body"><span class="o-t">B 温和轮询（前端 60 秒 / TTL 5 分钟）<span class="rec-chip">我建议</span><span class="cost-chip">约 0.5 天</span></span>
+          <span class="o-d">界面会自己更新，滞后最多 5 分钟，东财请求量反而<b>比现在更低</b>（因为 TTL 挡掉了重复回源）。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q1" value="A 保持手动，但仍补 TTL 缓存">
+          <span class="o-body"><span class="o-t">A 保持手动，只补 TTL<span class="cost-chip">约 0.2 天</span></span>
+          <span class="o-d">最省。符合「每天只看 1–2 次」的定位。补 TTL 是为了防狂点刷新。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q1" value="C 准实时：前端 15 秒 + 后端 TTL 1 分钟">
+          <span class="o-body"><span class="o-t">C 准实时（15 秒 / TTL 1 分钟）<span class="cost-chip">约 0.5 天</span></span>
+          <span class="o-d">滞后 &lt;1 分钟。<b>我不建议</b>：板块资金流是慢变量，1 分钟和 5 分钟的差别看不出来，但请求量翻 5 倍。</span></span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder="比如：只在我打开着资金流页面时刷新，切走就停"></textarea></div>
+    </div>
+  </section>
+
+  <!-- ═══ 四、回放的数据边界 ═══ -->
+  <section>
+    <h2 class="sec">四、回放能做成什么样，由数据决定</h2>
+
+    <div class="card">
+      <p style="margin-top:0"><b>先说清楚数据边界，因为它直接决定了回放的形态 —— 这不是设计取舍，是硬约束。</b></p>
+      <p><b>已经有的：</b>每天收盘后留档 <b>Top20 个板块</b>的分时曲线，每个 240 个分钟点（09:31→15:00）。
+      这些点是<b>当日累计值</b>，所以回放时数值会从 0 一路长起来 —— 天然就是「资金逐步进场」的动画，不用额外处理。</p>
+      <p><b>没有的：</b>全部 496 个板块的分钟级数据。原因是<b>抓取成本</b>：分时接口一次只能取一个板块，
+      要覆盖 496 个就是 496 个请求。而且必须串行 + 间隔（现在是 1.5 秒/个），
+      496 个要跑 <b>12 分钟以上</b>，还极可能触发限流。</p>
+      <p style="margin-bottom:0"><b>所以回放的可选范围是「留档多少个板块」，这是个成本换覆盖的旋钮：</b></p>
+    </div>
+
+    <div class="scrollx"><table>
+      <tr><th style="width:14%">留档范围</th><th style="width:15%">每日新增请求</th><th style="width:15%">收盘任务耗时</th><th style="width:14%">每年存储</th><th>回放能看到什么</th></tr>
+      <tr><td><b>Top20（现状）</b></td><td>20</td><td>约 30 秒</td><td class="ok">约 50 MB</td><td>当日最热的 20 个。<b>够做曲线赛跑</b>，热力图会显得稀疏</td></tr>
+      <tr><td><b>Top50</b></td><td>50</td><td>约 75 秒</td><td class="ok">约 125 MB</td><td>热力图有内容了，主要板块基本都在</td></tr>
+      <tr><td><b>Top100</b></td><td>100</td><td>约 2.5 分钟</td><td class="warn">约 250 MB</td><td>接近完整市场图景，但请求量已是现在的 5 倍</td></tr>
+      <tr><td><del>全部 496</del></td><td class="no">496</td><td class="no">约 12 分钟</td><td class="no">约 1.2 GB</td><td><b>不可行</b> —— 极可能触发限流，且没人会看长尾板块的回放</td></tr>
+    </table></div>
+
+    <div class="amber">
+      <div class="rt"><span class="tag">注意</span>回放只能回放「已经存过的日子」</div>
+      <p>东财的分时接口<b>只提供当日</b>，历史分时拿不到。所以功能上线前的日子<b>永远补不回来</b> ——
+      回放从上线那天开始才有得看。这跟历史日线是同一个道理，也再次说明早点开始落库是有价值的。</p>
+    </div>
+
+    <div class="dq" id="Q2" data-q="Q2" data-title="分时留档范围">
+      <div class="dq-hd"><span class="dq-id">Q2</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">每天留档多少个板块的分时？</div>
+      <div class="dq-sub">这题<b>越早定越好</b>：定小了，将来想扩也补不回过去的日子。改的是 <code>MinuteKeepTop</code> 一个常量，但它决定了回放的天花板。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q2" value="Top50：热力图回放有内容，成本仍可控">
+          <span class="o-body"><span class="o-t">Top50<span class="rec-chip">我建议</span><span class="cost-chip">+30 请求/天 · 约 125 MB/年</span></span>
+          <span class="o-d">收盘任务多跑 45 秒（19:00 跑，没人等）。<b>热力图回放需要这个量级才不至于稀稀拉拉</b>，同时离限流量级还很远。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q2" value="维持 Top20">
+          <span class="o-body"><span class="o-t">维持 Top20<span class="cost-chip">零新增</span></span>
+          <span class="o-d">够做曲线赛跑。热力图回放会明显稀疏，但如果 Q3 只选赛跑形态，这就够了。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q2" value="Top100：接近完整市场图景">
+          <span class="o-body"><span class="o-t">Top100<span class="cost-chip">+80 请求/天 · 约 250 MB/年</span></span>
+          <span class="o-d">回放最完整。代价是收盘任务要跑 2.5 分钟，日请求量升到现在的 5 倍左右。</span></span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+  </section>
+
+  <!-- ═══ 五、回放形态 ═══ -->
+  <section>
+    <h2 class="sec">五、回放长什么样（两种形态，都用真实数据画）</h2>
+    <p class="note">下面每一帧都是 <b>2026-08-14 真实分时</b>在该时刻的实际数值 —— 通信 +139 亿、电力 −46 亿这些都是当天真数据，不是编的。</p>
+
+    <h3 class="sub">形态 A：曲线赛跑（横向条随时间生长、名次实时换位）</h3>
+    <div class="frames">
+      <div class="fr"><div class="fh">10:00 — 通信刚起势</div><svg viewBox="0 0 300 210" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><rect width="300" height="210" rx="9" fill="#0e141b"/><text x="12" y="22" font-size="12" font-weight="800" fill="#e6edf3">10:00</text><text x="288" y="22" font-size="9.5" fill="#8b9bab" text-anchor="end">主力累计净流入</text><text x="70" y="49" font-size="10.5" fill="#c4d0dc" text-anchor="end">稀土</text><rect x="151" y="38" width="38" height="15" rx="3" fill="#e33f56"/><text x="195" y="50" font-size="10" font-weight="800" fill="#e33f56" text-anchor="start">+8亿</text><text x="70" y="81" font-size="10.5" fill="#c4d0dc" text-anchor="end">化学制药</text><rect x="136" y="70" width="15" height="15" rx="3" fill="#16ad76"/><text x="131" y="82" font-size="10" font-weight="800" fill="#16ad76" text-anchor="end">-3亿</text><text x="70" y="113" font-size="10.5" fill="#c4d0dc" text-anchor="end">通信</text><rect x="123" y="102" width="28" height="15" rx="3" fill="#16ad76"/><text x="118" y="114" font-size="10" font-weight="800" fill="#16ad76" text-anchor="end">-6亿</text><text x="70" y="145" font-size="10.5" fill="#c4d0dc" text-anchor="end">证券Ⅱ</text><rect x="119" y="134" width="33" height="15" rx="3" fill="#16ad76"/><text x="114" y="146" font-size="10" font-weight="800" fill="#16ad76" text-anchor="end">-7亿</text><text x="70" y="177" font-size="10.5" fill="#c4d0dc" text-anchor="end">电力</text><rect x="80" y="166" width="71" height="15" rx="3" fill="#16ad76"/><text x="85" y="178" font-size="10" font-weight="800" fill="#fff" text-anchor="start">-29亿</text><line x1="151" y1="32" x2="151" y2="190" stroke="#4a5b6c" stroke-width="1"/></svg></div>
+      <div class="fr"><div class="fh">13:00 — 午后差距拉开</div><svg viewBox="0 0 300 210" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><rect width="300" height="210" rx="9" fill="#0e141b"/><text x="12" y="22" font-size="12" font-weight="800" fill="#e6edf3">13:00</text><text x="288" y="22" font-size="9.5" fill="#8b9bab" text-anchor="end">主力累计净流入</text><text x="70" y="49" font-size="10.5" fill="#c4d0dc" text-anchor="end">通信</text><rect x="151" y="38" width="139" height="15" rx="3" fill="#e33f56"/><text x="285" y="50" font-size="10" font-weight="800" fill="#fff" text-anchor="end">+54亿</text><text x="70" y="81" font-size="10.5" fill="#c4d0dc" text-anchor="end">稀土</text><rect x="151" y="70" width="19" height="15" rx="3" fill="#e33f56"/><text x="176" y="82" font-size="10" font-weight="800" fill="#e33f56" text-anchor="start">+8亿</text><text x="70" y="113" font-size="10.5" fill="#c4d0dc" text-anchor="end">化学制药</text><rect x="101" y="102" width="51" height="15" rx="3" fill="#16ad76"/><text x="106" y="114" font-size="10" font-weight="800" fill="#fff" text-anchor="start">-20亿</text><text x="70" y="145" font-size="10.5" fill="#c4d0dc" text-anchor="end">证券Ⅱ</text><rect x="95" y="134" width="56" height="15" rx="3" fill="#16ad76"/><text x="100" y="146" font-size="10" font-weight="800" fill="#fff" text-anchor="start">-22亿</text><text x="70" y="177" font-size="10.5" fill="#c4d0dc" text-anchor="end">电力</text><rect x="80" y="166" width="71" height="15" rx="3" fill="#16ad76"/><text x="85" y="178" font-size="10" font-weight="800" fill="#fff" text-anchor="start">-40亿</text><line x1="151" y1="32" x2="151" y2="190" stroke="#4a5b6c" stroke-width="1"/></svg></div>
+      <div class="fr"><div class="fh">15:00 — 收盘定格</div><svg viewBox="0 0 300 210" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><rect width="300" height="210" rx="9" fill="#0e141b"/><text x="12" y="22" font-size="12" font-weight="800" fill="#e6edf3">15:00</text><text x="288" y="22" font-size="9.5" fill="#8b9bab" text-anchor="end">主力累计净流入</text><text x="70" y="49" font-size="10.5" fill="#c4d0dc" text-anchor="end">通信</text><rect x="151" y="38" width="139" height="15" rx="3" fill="#e33f56"/><text x="285" y="50" font-size="10" font-weight="800" fill="#fff" text-anchor="end">+139亿</text><text x="70" y="81" font-size="10.5" fill="#c4d0dc" text-anchor="end">稀土</text><rect x="151" y="70" width="15" height="15" rx="3" fill="#e33f56"/><text x="171" y="82" font-size="10" font-weight="800" fill="#e33f56" text-anchor="start">+15亿</text><text x="70" y="113" font-size="10.5" fill="#c4d0dc" text-anchor="end">化学制药</text><rect x="128" y="102" width="24" height="15" rx="3" fill="#16ad76"/><text x="123" y="114" font-size="10" font-weight="800" fill="#16ad76" text-anchor="end">-24亿</text><text x="70" y="145" font-size="10.5" fill="#c4d0dc" text-anchor="end">证券Ⅱ</text><rect x="121" y="134" width="31" height="15" rx="3" fill="#16ad76"/><text x="116" y="146" font-size="10" font-weight="800" fill="#16ad76" text-anchor="end">-31亿</text><text x="70" y="177" font-size="10.5" fill="#c4d0dc" text-anchor="end">电力</text><rect x="105" y="166" width="46" height="15" rx="3" fill="#16ad76"/><text x="100" y="178" font-size="10" font-weight="800" fill="#16ad76" text-anchor="end">-46亿</text><line x1="151" y1="32" x2="151" y2="190" stroke="#4a5b6c" stroke-width="1"/></svg></div>
+    </div>
+    <div class="card" style="margin-top:4px">
+      <b>优点：</b>「谁在什么时候被买」看得最清楚，名次换位有戏剧性，20 个板块也够用。
+      <b>缺点：</b>只能看头部若干个，没有全市场的面。
+    </div>
+
+    <h3 class="sub">形态 B：热力图回放（色块面积/颜色随时间变化）</h3>
+    <div class="frames">
+      <div class="fr"><div class="fh">10:00</div><svg viewBox="0 0 300 200" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><rect width="300" height="200" rx="9" fill="#0e141b"/><rect x="6" y="26" width="29" height="168" rx="3" fill="rgb(15,77,58)" stroke="#0e141b" stroke-width="2"/><rect x="38" y="26" width="155" height="168" rx="3" fill="rgb(18,113,81)" stroke="#0e141b" stroke-width="2"/><text x="115" y="100.0" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">电力</text><text x="115" y="114.0" font-size="9.5" fill="#fff" opacity=".85" text-anchor="middle">-29亿</text><rect x="196" y="26" width="34" height="168" rx="3" fill="rgb(15,79,59)" stroke="#0e141b" stroke-width="2"/><rect x="233" y="26" width="14" height="168" rx="3" fill="rgb(14,69,53)" stroke="#0e141b" stroke-width="2"/><rect x="250" y="26" width="41" height="168" rx="3" fill="rgb(101,31,46)" stroke="#0e141b" stroke-width="2"/><text x="14" y="18" font-size="11" font-weight="800" fill="#e6edf3">10:00</text><text x="286" y="18" font-size="9.5" fill="#8b9bab" text-anchor="end">顺序固定</text></svg></div>
+      <div class="fr"><div class="fh">15:00</div><svg viewBox="0 0 300 200" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><rect width="300" height="200" rx="9" fill="#0e141b"/><rect x="6" y="26" width="154" height="168" rx="3" fill="rgb(227,63,86)" stroke="#0e141b" stroke-width="2"/><text x="83" y="100.0" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">通信</text><text x="83" y="114.0" font-size="9.5" fill="#fff" opacity=".85" text-anchor="middle">+139亿</text><rect x="163" y="26" width="49" height="168" rx="3" fill="rgb(19,131,92)" stroke="#0e141b" stroke-width="2"/><text x="188" y="100.0" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">电力</text><text x="188" y="114.0" font-size="9.5" fill="#fff" opacity=".85" text-anchor="middle">-46亿</text><rect x="215" y="26" width="32" height="168" rx="3" fill="rgb(18,115,82)" stroke="#0e141b" stroke-width="2"/><rect x="250" y="26" width="24" height="168" rx="3" fill="rgb(17,106,77)" stroke="#0e141b" stroke-width="2"/><rect x="277" y="26" width="14" height="168" rx="3" fill="rgb(117,35,51)" stroke="#0e141b" stroke-width="2"/><text x="14" y="18" font-size="11" font-weight="800" fill="#e6edf3">15:00</text><text x="286" y="18" font-size="9.5" fill="#8b9bab" text-anchor="end">顺序固定</text></svg></div>
+    </div>
+    <div class="card" style="margin-top:4px">
+      <b>优点：</b>和现在的热力图一脉相承，能看到「资金从哪块流到哪块」的全局迁移。
+      <b>缺点：</b>板块少了会稀疏（所以和 Q2 强相关），且有下面这个布局问题。
+    </div>
+
+    <div class="dq" id="Q3" data-q="Q3" data-title="回放形态">
+      <div class="dq-hd"><span class="dq-id">Q3</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">回放做哪种形态？</div>
+      <div class="dq-sub">两种可以都做（共用同一套回放控制条和数据），但首版建议先做一个、跑顺了再加。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q3" value="A 曲线赛跑（首版）">
+          <span class="o-body"><span class="o-t">A 曲线赛跑<span class="rec-chip">我建议首版</span><span class="cost-chip">约 1 天</span></span>
+          <span class="o-d">Top20 就够，<b>不依赖 Q2 扩容</b>，可以立刻做。信息密度最高，最适合回答「今天资金什么时候进的哪里」。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q3" value="B 热力图回放">
+          <span class="o-body"><span class="o-t">B 热力图回放<span class="cost-chip">约 1.5 天</span></span>
+          <span class="o-d">全局迁移感最强，和现有热力图一致。<b>需要 Q2 选 Top50 以上</b>才不至于稀疏。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q3" value="A + B 都做，共用控制条">
+          <span class="o-body"><span class="o-t">A + B 都做<span class="cost-chip">约 2 天</span></span>
+          <span class="o-d">在回放面板里切换两种视图。控制条和数据加载是共用的，所以不是简单相加。</span></span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+  </section>
+
+  <!-- ═══ 六、布局稳定性 ═══ -->
+  <section>
+    <h2 class="sec">六、热力图回放的一个真问题：每帧要不要重排</h2>
+    <p class="note">这个问题只在 Q3 选了 B 或「都做」时才需要拍。但它影响很大 —— 选错了回放会看得人眼晕。</p>
+    <div class="grid2">
+      <div class="vcard">
+        <div class="vh"><span class="no">甲</span>顺序固定（按收盘排名布局）</div>
+        <div class="vs">色块位置全程不动，只有面积和颜色在变。</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:190px"><svg viewBox="0 0 300 200" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><rect width="300" height="200" rx="9" fill="#0e141b"/><rect x="6" y="26" width="29" height="168" rx="3" fill="rgb(15,77,58)" stroke="#0e141b" stroke-width="2"/><rect x="38" y="26" width="155" height="168" rx="3" fill="rgb(18,113,81)" stroke="#0e141b" stroke-width="2"/><text x="115" y="100.0" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">电力</text><text x="115" y="114.0" font-size="9.5" fill="#fff" opacity=".85" text-anchor="middle">-29亿</text><rect x="196" y="26" width="34" height="168" rx="3" fill="rgb(15,79,59)" stroke="#0e141b" stroke-width="2"/><rect x="233" y="26" width="14" height="168" rx="3" fill="rgb(14,69,53)" stroke="#0e141b" stroke-width="2"/><rect x="250" y="26" width="41" height="168" rx="3" fill="rgb(101,31,46)" stroke="#0e141b" stroke-width="2"/><text x="14" y="18" font-size="11" font-weight="800" fill="#e6edf3">10:00</text><text x="286" y="18" font-size="9.5" fill="#8b9bab" text-anchor="end">顺序固定</text></svg></div>
+          <div style="flex:1;min-width:190px"><svg viewBox="0 0 300 200" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><rect width="300" height="200" rx="9" fill="#0e141b"/><rect x="6" y="26" width="154" height="168" rx="3" fill="rgb(227,63,86)" stroke="#0e141b" stroke-width="2"/><text x="83" y="100.0" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">通信</text><text x="83" y="114.0" font-size="9.5" fill="#fff" opacity=".85" text-anchor="middle">+139亿</text><rect x="163" y="26" width="49" height="168" rx="3" fill="rgb(19,131,92)" stroke="#0e141b" stroke-width="2"/><text x="188" y="100.0" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">电力</text><text x="188" y="114.0" font-size="9.5" fill="#fff" opacity=".85" text-anchor="middle">-46亿</text><rect x="215" y="26" width="32" height="168" rx="3" fill="rgb(18,115,82)" stroke="#0e141b" stroke-width="2"/><rect x="250" y="26" width="24" height="168" rx="3" fill="rgb(17,106,77)" stroke="#0e141b" stroke-width="2"/><rect x="277" y="26" width="14" height="168" rx="3" fill="rgb(117,35,51)" stroke="#0e141b" stroke-width="2"/><text x="14" y="18" font-size="11" font-weight="800" fill="#e6edf3">15:00</text><text x="286" y="18" font-size="9.5" fill="#8b9bab" text-anchor="end">顺序固定</text></svg></div>
+        </div>
+        <ul>
+          <li><b>优点：</b>眼睛能锁定某一块盯着看它怎么变，不晕</li>
+          <li><b>缺点：</b>用了「上帝视角」—— 10:00 时的排位其实是收盘才知道的</li>
+        </ul>
+      </div>
+      <div class="vcard">
+        <div class="vh"><span class="no">乙</span>每帧重排（按当前时刻排名）</div>
+        <div class="vs">每一帧都按当下的净额重新布局，位置一直在换。</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <div style="flex:1;min-width:190px"><svg viewBox="0 0 300 200" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><rect width="300" height="200" rx="9" fill="#0e141b"/><rect x="6" y="26" width="155" height="168" rx="3" fill="rgb(18,113,81)" stroke="#0e141b" stroke-width="2"/><text x="83" y="100.0" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">电力</text><text x="83" y="114.0" font-size="9.5" fill="#fff" opacity=".85" text-anchor="middle">-29亿</text><rect x="164" y="26" width="41" height="168" rx="3" fill="rgb(101,31,46)" stroke="#0e141b" stroke-width="2"/><rect x="208" y="26" width="34" height="168" rx="3" fill="rgb(15,79,59)" stroke="#0e141b" stroke-width="2"/><rect x="245" y="26" width="29" height="168" rx="3" fill="rgb(15,77,58)" stroke="#0e141b" stroke-width="2"/><rect x="277" y="26" width="14" height="168" rx="3" fill="rgb(14,69,53)" stroke="#0e141b" stroke-width="2"/><text x="14" y="18" font-size="11" font-weight="800" fill="#e6edf3">10:00</text><text x="286" y="18" font-size="9.5" fill="#8b9bab" text-anchor="end">每帧重排</text></svg></div>
+          <div style="flex:1;min-width:190px"><svg viewBox="0 0 300 200" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><rect width="300" height="200" rx="9" fill="#0e141b"/><rect x="6" y="26" width="154" height="168" rx="3" fill="rgb(227,63,86)" stroke="#0e141b" stroke-width="2"/><text x="83" y="100.0" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">通信</text><text x="83" y="114.0" font-size="9.5" fill="#fff" opacity=".85" text-anchor="middle">+139亿</text><rect x="163" y="26" width="49" height="168" rx="3" fill="rgb(19,131,92)" stroke="#0e141b" stroke-width="2"/><text x="188" y="100.0" font-size="10" font-weight="700" fill="#fff" text-anchor="middle">电力</text><text x="188" y="114.0" font-size="9.5" fill="#fff" opacity=".85" text-anchor="middle">-46亿</text><rect x="215" y="26" width="32" height="168" rx="3" fill="rgb(18,115,82)" stroke="#0e141b" stroke-width="2"/><rect x="250" y="26" width="24" height="168" rx="3" fill="rgb(17,106,77)" stroke="#0e141b" stroke-width="2"/><rect x="277" y="26" width="14" height="168" rx="3" fill="rgb(117,35,51)" stroke="#0e141b" stroke-width="2"/><text x="14" y="18" font-size="11" font-weight="800" fill="#e6edf3">15:00</text><text x="286" y="18" font-size="9.5" fill="#8b9bab" text-anchor="end">每帧重排</text></svg></div>
+        </div>
+        <ul>
+          <li><b>优点：</b>如实反映「此刻的格局」，没有未来信息</li>
+          <li><b>缺点：</b>色块乱跳，<b>盯不住任何一块</b>，回放变成万花筒</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="dq" id="Q4" data-q="Q4" data-title="回放时布局是否固定">
+      <div class="dq-hd"><span class="dq-id">Q4</span><span class="dq-state">待你决策</span></div>
+      <div class="dq-q">热力图回放时，色块位置固定还是每帧重排？</div>
+      <div class="dq-sub">Q3 没选热力图的话这题可以跳过（直接选「跟随 Q3」）。</div>
+      <div class="dq-opts">
+        <label class="dq-opt"><input type="radio" name="Q4" value="甲 顺序固定，按收盘排名布局">
+          <span class="o-body"><span class="o-t">甲 顺序固定<span class="rec-chip">我建议</span></span>
+          <span class="o-d">可读性压倒性地好。「用了收盘信息」这点在回放场景下不算问题 —— <b>回放本来就是事后复盘，不是模拟盘中决策</b>。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q4" value="乙 每帧重排，如实反映当下格局">
+          <span class="o-body"><span class="o-t">乙 每帧重排</span>
+          <span class="o-d">没有未来信息，但色块会一直跳。如果你的用法是「模拟当时看盘」，这个更诚实。</span></span></label>
+        <label class="dq-opt"><input type="radio" name="Q4" value="跟随 Q3（没选热力图则不适用）">
+          <span class="o-body"><span class="o-t">不适用 / 跟随 Q3</span>
+          <span class="o-d">Q3 只选了曲线赛跑的话选这个。</span></span></label>
+      </div>
+      <div class="dq-note"><label>补充（可留空）</label><textarea placeholder=""></textarea></div>
+    </div>
+  </section>
+
+  <!-- ═══ 七、控制条 ═══ -->
+  <section>
+    <h2 class="sec">七、回放控制条</h2>
+    <div class="chart">
+      <div class="ct"><span class="no">C1</span>播放控制 <span class="real">按真实交易时段刻度</span></div>
+      <div class="cs">进度轴按 A 股交易时段刻度，<b>午休 11:30–13:00 画成灰段并直接跳过</b> —— 那 90 分钟没有数据，
+      不跳的话进度条会卡在原地不动，看起来像卡死了。</div>
+      <svg viewBox="0 0 980 92" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="PingFang SC,sans-serif"><rect width="980" height="92" rx="11" fill="#fff" stroke="#e4edf4"/><circle cx="34" cy="46" r="17" fill="#4f46e5"/><path d="M29 38 L44 46 L29 54 Z" fill="#fff"/><rect x="68" y="43" width="722" height="6" rx="3" fill="#e9edf5"/><rect x="68" y="43" width="419" height="6" rx="3" fill="#4f46e5"/><circle cx="487" cy="46" r="8" fill="#fff" stroke="#4f46e5" stroke-width="3"/><line x1="68" y1="54" x2="68" y2="59" stroke="#c3ccdb" stroke-width="1.5"/><text x="68" y="72" font-size="10" fill="#93a3b3" text-anchor="middle">09:30</text><line x1="429" y1="54" x2="429" y2="59" stroke="#c3ccdb" stroke-width="1.5"/><text x="429" y="72" font-size="10" fill="#93a3b3" text-anchor="middle">11:30</text><line x1="443" y1="54" x2="443" y2="59" stroke="#c3ccdb" stroke-width="1.5"/><text x="443" y="72" font-size="10" fill="#93a3b3" text-anchor="middle">13:00</text><line x1="790" y1="54" x2="790" y2="59" stroke="#c3ccdb" stroke-width="1.5"/><text x="790" y="72" font-size="10" fill="#93a3b3" text-anchor="middle">15:00</text><rect x="429" y="43" width="14" height="6" fill="#c3ccdb"/><text x="68" y="32" font-size="11" font-weight="800" fill="#22303f">13:42</text><text x="120" y="32" font-size="10.5" fill="#93a3b3">已回放 58%</text><rect x="808" y="33" width="35" height="26" rx="13" fill="#fff" stroke="#d6dcea"/><text x="825.5" y="51" font-size="11" font-weight="700" fill="#54687c" text-anchor="middle">1×</text><rect x="848" y="33" width="35" height="26" rx="13" fill="#4f46e5" stroke="#4f46e5"/><text x="865.5" y="51" font-size="11" font-weight="700" fill="#fff" text-anchor="middle">4×</text><rect x="888" y="33" width="35" height="26" rx="13" fill="#fff" stroke="#d6dcea"/><text x="905.5" y="51" font-size="11" font-weight="700" fill="#54687c" text-anchor="middle">16×</text><text x="860" y="76" font-size="9.5" fill="#93a3b3" text-anchor="middle">播放速度</text><text x="14" y="82" font-size="10" fill="#93a3b3">空格键播放/暂停 · 左右方向键逐分钟步进 · 拖动圆点跳转</text></svg>
+    </div>
+    <div class="card">
+      <p style="margin-top:0"><b>默认速度 4×：</b>240 分钟按 1× 放要 4 分钟，太久；4× 约 1 分钟，正好是一杯咖啡的注意力。
+      16× 用来快速扫一遍找异动时点。</p>
+      <p style="margin-bottom:0"><b>回放哪一天：</b>默认最近一个有留档的交易日，可以选日期。
+      没有留档的日子在日期选择器里置灰，并注明「该功能上线前的日期没有数据」。</p>
+    </div>
+  </section>
+
+  <!-- ═══ 八、工作量 ═══ -->
+  <section>
+    <h2 class="sec">八、工作量与落地</h2>
+    <div class="scrollx"><table>
+      <tr><th style="width:26%">模块</th><th style="width:12%">人日</th><th>说明</th></tr>
+      <tr><td>后端 TTL 缓存</td><td>0.2</td><td><b>前置项</b>，Q1 选任何方案都要做</td></tr>
+      <tr><td>前端自动刷新</td><td>0.3</td><td>轮询 + 可见性暂停 + 无闪烁局部更新（Q1 选 A 则省掉）</td></tr>
+      <tr><td>回放数据 API</td><td>0.4</td><td>一次返回某日全部留档板块的分时（回放要一把拿全，不能逐个请求）</td></tr>
+      <tr><td>留档扩容</td><td>0.1</td><td>改 <code>MinuteKeepTop</code> 常量 + 调间隔（Q2 定）</td></tr>
+      <tr><td>回放控制条</td><td>0.5</td><td>播放/暂停/进度/速度/键盘快捷键，两种形态共用</td></tr>
+      <tr><td>回放渲染</td><td>1.0–2.0</td><td>取决于 Q3</td></tr>
+      <tr><td><b>合计</b></td><td><b>2.5–3.5</b></td><td>不含联调与验收往返</td></tr>
+    </table></div>
+    <p class="note"><b>本项目非小程序，不涉及分享设计</b> —— 桌面端 Web，无分享入口需求，故本节不写。</p>
+  </section>
+
+  <!-- ═══ 九、汇总 ═══ -->
+  <section>
+    <h2 class="sec">九、决策汇总与提交</h2>
+    <div class="card">
+      <div style="font-size:15px;font-weight:800;color:var(--ink);margin-bottom:4px">你的决策汇总</div>
+      <div style="font-size:12.5px;margin-bottom:14px">随上面的作答实时更新。<b>没答完也能复制</b> —— 未决策的会标成「未答」。</div>
+      <div id="sumList"></div>
+      <div style="font-size:13px;font-weight:800;color:var(--ink);margin:18px 0 0">粘给 Claude 的内容</div>
+      <textarea class="dq-out" id="dqOut" readonly></textarea>
+      <div style="display:flex;gap:10px;margin-top:11px;flex-wrap:wrap">
+        <button class="primary" id="btnCopyBottom" style="font-size:13.5px;font-weight:800;padding:10px 22px;border-radius:22px;border:1px solid var(--primary-deep);background:var(--primary-deep);color:#fff;cursor:pointer">复制答案</button>
+        <button id="btnNext2" style="font-size:13px;font-weight:700;padding:10px 18px;border-radius:22px;border:1px solid #c6d6e2;background:#fff;color:var(--ink-2);cursor:pointer">回到第一个未答 ↑</button>
+      </div>
+      <div class="copy-hint">复制后直接粘进聊天框发我即可。答案存在你本地浏览器，关掉页面不会丢。</div>
+    </div>
+    <div style="font-size:12px;color:var(--muted);margin-top:14px;line-height:1.9">
+      开工 Gate：四道题答完 · TTL 缓存这个前置项已确认 · 留档范围（Q2）已定 —— <b>它决定回放的天花板，且过去的日子补不回来</b>。
+    </div>
+  </section>
+
+  <div class="toast" id="toast">已复制</div>
+</div>
+<!-- ============================================================================
+     决策卡引擎（零配置，勿改）
+     - 自动发现所有 .dq 卡片，题目短标题读 data-title
+     - localStorage 键名按文件名生成，多份稿互不干扰
+     - 加一道题只需复制一个 .dq 块，不用碰这段 JS
+     ============================================================================ -->
+<script>
+(function(){
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.dq'));
+  if (!cards.length) return;
+
+  // 键名 = 目录名 + 文件名。**只用文件名不行**：约定把稿子放成
+  // <feature-dir>/prd.html 之后，所有稿的文件名都叫 prd.html —— 那样它们会共用同一份答案，
+  // 表现是「这份稿里没点过的题，冒出别份稿的旧答案」（2026-08-14 真踩过，且很难看出来）。
+  var segs = location.pathname.split('/').filter(Boolean);
+  var file = (segs.pop() || 'product-spec').replace(/\.html?$/i,'');
+  var dir  = segs.pop() || '';
+  var KEY = 'dq::' + (dir ? dir + '/' : '') + file;
+
+  var titleOf = {};
+  cards.forEach(function(c){
+    titleOf[c.getAttribute('data-q')] = c.getAttribute('data-title') || c.getAttribute('data-q');
+  });
+
+  // 题号顺序（汇总/浮标用）与页面顺序（「下一个」用）是两套，别混
+  var byNum = cards.map(function(c){ return c.getAttribute('data-q'); })
+                   .sort(function(a,b){ return (+a.replace(/\D/g,'')) - (+b.replace(/\D/g,'')); });
+  var byDom = cards.map(function(c){ return c.getAttribute('data-q'); });
+
+  var state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e) { state = {}; }
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch(e){} }
+  function get(id){ return state[id] || { v:'', note:'' }; }
+  function esc(s){ return String(s).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+
+  function render(){
+    var done = 0;
+    cards.forEach(function(card){
+      var id = card.getAttribute('data-q'), s = get(id), ok = !!s.v;
+      if (ok) done++;
+      card.classList.toggle('answered', ok);
+      card.querySelector('.dq-state').textContent = ok ? ('已定：' + s.v) : '待你决策';
+      card.querySelectorAll('.dq-opt').forEach(function(opt){
+        var r = opt.querySelector('input');
+        r.checked = (r.value === s.v);
+        opt.classList.toggle('sel', r.checked);
+      });
+      var ta = card.querySelector('.dq-note textarea');
+      if (ta && ta.value !== s.note) ta.value = s.note || '';
+    });
+
+    var pt = document.getElementById('pTxt');
+    pt.innerHTML = '<em>' + done + '</em> / ' + cards.length + ' 已决策';
+    pt.classList.toggle('all-done', done === cards.length);
+    document.getElementById('pFill').style.width = (done / cards.length * 100) + '%';
+
+    var rail = document.getElementById('dqRail');
+    rail.innerHTML = '';
+    byNum.forEach(function(id){
+      var d = document.createElement('div');
+      d.className = 'rdot' + (get(id).v ? ' done' : '');
+      d.textContent = id;
+      d.title = titleOf[id] + (get(id).v ? '：' + get(id).v : '（待决策）');
+      d.onclick = function(){ jumpTo(id); };
+      rail.appendChild(d);
+    });
+
+    document.querySelectorAll('h2.sec').forEach(function(h){
+      var old = h.querySelector('.sec-badge'); if (old) old.remove();
+      var sec = h.closest('section'); if (!sec) return;
+      var inSec = Array.prototype.slice.call(sec.querySelectorAll('.dq'));
+      if (!inSec.length) return;
+      var open = inSec.filter(function(c){ return !get(c.getAttribute('data-q')).v; }).length;
+      var b = document.createElement('span');
+      b.className = 'sec-badge' + (open ? '' : ' done');
+      b.innerHTML = '<i></i>' + (open ? (open + ' 个待你决策') : '本节已决策完');
+      h.appendChild(b);
+    });
+
+    renderSummary(done);
+  }
+
+  function renderSummary(done){
+    var list = document.getElementById('sumList');
+    if (list) {
+      list.innerHTML = '';
+      byNum.forEach(function(id){
+        var s = get(id);
+        var row = document.createElement('div');
+        row.className = 'dqsum-row' + (s.v ? ' done' : '');
+        row.innerHTML = '<div class="s-id">' + id + '</div>' +
+          '<div class="s-q">' + esc(titleOf[id]) + '</div>' +
+          '<div class="s-a">' + (s.v ? esc(s.v) : '未答') +
+          (s.note ? '<span class="s-note">' + esc(s.note) + '</span>' : '') + '</div>';
+        row.onclick = function(){ jumpTo(id); };
+        list.appendChild(row);
+      });
+    }
+    var out = document.getElementById('dqOut');
+    if (!out) return;
+    var title = (document.querySelector('h1') || {}).textContent || slug;
+    var lines = ['【' + title.trim() + ' · 决策回复】'];
+    var missing = [];
+    byNum.forEach(function(id){
+      var s = get(id);
+      if (s.v) lines.push(id + ' = ' + s.v + (s.note ? '（补充：' + s.note + '）' : ''));
+      else missing.push(id);
+    });
+    if (missing.length) lines.push('', '未答：' + missing.join('、'));
+    lines.push('', '（' + done + '/' + cards.length + ' 已决策）');
+    out.value = lines.join('\n');
+  }
+
+  function jumpTo(id){
+    var el = document.getElementById(id); if (!el) return;
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+    el.style.transition = 'box-shadow .25s';
+    el.style.boxShadow = '0 0 0 4px rgba(233,162,59,.32)';
+    setTimeout(function(){ el.style.boxShadow=''; }, 900);
+  }
+
+  function nextOpen(){
+    var open = byDom.filter(function(id){ return !get(id).v; });
+    if (!open.length) { toast('都答完了，点「复制答案」发我'); return; }
+    var y = window.scrollY + 120;
+    var below = open.filter(function(id){ return document.getElementById(id).offsetTop > y; });
+    jumpTo(below.length ? below[0] : open[0]);
+  }
+
+  cards.forEach(function(card){
+    var id = card.getAttribute('data-q');
+    card.querySelectorAll('.dq-opt input').forEach(function(r){
+      r.addEventListener('change', function(){
+        var s = get(id); s.v = r.value; state[id] = s; save(); render();
+      });
+    });
+    var ta = card.querySelector('.dq-note textarea');
+    if (ta) ta.addEventListener('input', function(){
+      var s = get(id); s.note = ta.value.trim(); state[id] = s; save();
+      renderSummary(byNum.filter(function(x){ return !!get(x).v; }).length);
+    });
+  });
+
+  var tId;
+  function toast(msg){
+    var t = document.getElementById('toast'); if (!t) return;
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(tId); tId = setTimeout(function(){ t.classList.remove('show'); }, 1900);
+  }
+
+  function copyOut(){
+    var ta = document.getElementById('dqOut'); if (!ta) return;
+    function fallback(){
+      ta.removeAttribute('readonly'); ta.select();
+      try { document.execCommand('copy'); toast('已复制，粘给我即可'); }
+      catch(e){ toast('复制失败，请手动全选下方文本'); }
+      ta.setAttribute('readonly','readonly');
+      window.getSelection().removeAllRanges();
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(ta.value).then(function(){ toast('已复制，粘给我即可'); }, fallback);
+    } else fallback();
+  }
+
+  function bind(id, fn){ var el = document.getElementById(id); if (el) el.onclick = fn; }
+  bind('btnNext', nextOpen); bind('btnNext2', nextOpen);
+  bind('btnCopyTop', copyOut); bind('btnCopyBottom', copyOut);
+  bind('btnReset', function(){
+    if (!confirm('清空所有已作答的决策？')) return;
+    state = {}; save(); render(); toast('已清空');
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
